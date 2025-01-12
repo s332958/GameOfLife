@@ -1,0 +1,2 @@
+nvcc -arch=sm_50 main.cpp libs/kernel.cu libs/loader.cpp -o main
+./main
