@@ -8,7 +8,7 @@ void controllo_errore_cuda(char *descrizione, cudaError_t errore){
     printf("%s: %s\n",descrizione,cudaGetErrorString(errore));
 }
 
-void simulazione(char *world_name, char *filter_name, char **creature_names, int number_of_creatures, cudaStream_t stream){
+void simulazione(char *world_name, char *filter_name, char **creature_names, int* vx, int* vy, int number_of_creatures, cudaStream_t stream){
     cudaError_t err = cudaSuccess;
 
     //controllo_errore_cuda("creazione stream simulazione",cudaStreamCreate(&stream));
@@ -48,7 +48,7 @@ void simulazione(char *world_name, char *filter_name, char **creature_names, int
 
         controllo_errore_cuda("allocazione creatura",cudaMalloc( (void**)&creature_cu, dim_creature[i]*dim_creature[i]*sizeof(float) ));
         controllo_errore_cuda("passaggio creatura su GPU",cudaMemcpyAsync( creature_cu, creature[i], dim_creature[i]*dim_creature[i]*sizeof(float), cudaMemcpyHostToDevice, stream ));
-        wrap_add_creature_to_world(creature_cu,mondo_cu,id_matrix_cu,dim_creature[i],dim_mondo,0,0,numero_creature+1,&numero_creature,stream);
+        wrap_add_creature_to_world(creature_cu,mondo_cu,id_matrix_cu,dim_creature[i],dim_mondo,vx[i],vy[i],numero_creature+1,&numero_creature,stream);
         controllo_errore_cuda("liberazione memoria creatura appena allocata in GPU",cudaFree(creature_cu));
 
     }
@@ -94,15 +94,24 @@ void simulazione(char *world_name, char *filter_name, char **creature_names, int
 
 int main(){
 
+    int const MAX_CREATURE = 10;
+
     char *nome_mondo = "data/world.txt", *nome_creatura="data/creature.txt", *nome_filtro="data/filter.txt";
-    char **creature = (char**) malloc(10 * sizeof(char*));
+    char **creature = (char**) malloc(MAX_CREATURE * sizeof(char*));
+    int *vx = (int*) malloc(MAX_CREATURE*sizeof(int));
+    int *vy = (int*) malloc(MAX_CREATURE*sizeof(int));
     creature[0] = nome_creatura;
+    vx[0] = 1;
+    vy[0] = 1;
+    creature[1] = nome_creatura;
+    vx[1] = 4;
+    vy[1] = 4;
 
     cudaStream_t vs[3];
 
     for(int i=0;i<3;i++){
         controllo_errore_cuda("creazione stream simulazione",cudaStreamCreate(&vs[i]));
-        simulazione(nome_mondo,nome_filtro,creature,1,vs[i]);
+        simulazione(nome_mondo,nome_filtro,creature,vx,vy,2,vs[i]);
     }
 
     for(int i=0;i<3;i++){
