@@ -1,89 +1,113 @@
+#include "libs/loader.h"
+#include "libs/kernel.cuh"
 #include <cuda_runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "libs/kernel.cuh"
-#include "libs/loader.h"
-#include <iostream>
-#include <iomanip>
 
-int main(){
-    printf("Start Main (Single Simulation): \n");
+void controllo_errore_cuda(char *descrizione, cudaError_t errore){
+    printf("%s: %s\n",descrizione,cudaGetErrorString(errore));
+}
 
-    //0: cpu init variable
-    int dim_world, dim_filter, dim_creature, number_of_creatures=0;
+void simulazione(char *world_name, char *filter_name, char **creature_names, int number_of_creatures, cudaStream_t stream){
+    cudaError_t err = cudaSuccess;
+
+    //controllo_errore_cuda("creazione stream simulazione",cudaStreamCreate(&stream));
+
+    int *dim_creature, dim_mondo, dim_filtro;
+    float **creature, *filtro, *mondo;
     int *id_matrix;
-    float *world, *filter, *creature;
 
-    //0: load from file: world, id_matrix, filter and creature
-    readWorld("data/world.txt",&dim_world,&world,&id_matrix);
-    readMatrix("data/creature.txt",&dim_creature,&creature);
-    readMatrix("data/filter.txt",&dim_filter,&filter);
+    creature = (float**) malloc(number_of_creatures*sizeof(float*));
+    dim_creature = (int*) malloc(number_of_creatures*sizeof(int));
 
-    printing_matrix("creatura",creature,dim_creature);
+    char *nome_mondo = world_name, *nome_creatura=creature_names[0], *nome_filtro=filter_name;
+    readWorld(nome_mondo,&dim_mondo,&mondo,&id_matrix);
+    readMatrix(nome_filtro,&dim_filtro,&filtro);
 
-    //0: cuda memory allocation
-    float *world_cu, *filter_cu, *creature_cu;
+    printing_world("Stampa del mondo iniziale",mondo,id_matrix,dim_mondo);
+    printing_matrix("Stampa del filtro",filtro,dim_filtro);
+
+    for(int i=0;i<number_of_creatures;i++){
+        char *nome_creatura=creature_names[i];
+        readMatrix(nome_creatura,&dim_creature[i],&creature[i]);
+        printing_matrix("Stampa della creatura",creature[i],dim_creature[i]);
+    }
+
+    int numero_creature = 0;
+
+    float *mondo_cu, *filtro_cu, *creature_cu;
     int *id_matrix_cu;
 
-    cudaMalloc( (void**)&world_cu, dim_world*dim_world*sizeof(float) );
-    cudaMalloc( (void**)&id_matrix_cu, dim_world*dim_world*sizeof(int) );
-    cudaMalloc( (void**)&filter_cu, dim_filter*dim_filter*sizeof(float) );
-    cudaMalloc( (void**)&creature_cu, dim_creature*dim_creature*sizeof(float) );
+    controllo_errore_cuda("allocazione mondo",cudaMalloc( (void**)&mondo_cu, dim_mondo*dim_mondo*sizeof(float) ));
+    controllo_errore_cuda("allocazione id_matrix",cudaMalloc( (void**)&id_matrix_cu, dim_mondo*dim_mondo*sizeof(int) ));
 
-    cudaMemcpy( world_cu, world, dim_world*dim_world*sizeof(float), cudaMemcpyHostToDevice );
-    cudaMemcpy( id_matrix_cu, id_matrix, dim_world*dim_world*sizeof(int), cudaMemcpyHostToDevice );
-    cudaMemcpy( filter_cu, filter, dim_filter*dim_filter*sizeof(float), cudaMemcpyHostToDevice );
-    cudaMemcpy( creature_cu, creature, dim_creature*dim_creature*sizeof(float), cudaMemcpyHostToDevice );
+    controllo_errore_cuda("passaggio mondo su GPU",cudaMemcpyAsync( mondo_cu, mondo, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyHostToDevice, stream ));
+    controllo_errore_cuda("passaggio id_matrix su GPU",cudaMemcpyAsync( id_matrix_cu, id_matrix, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyHostToDevice, stream ));
 
-    //1: add creatures to world 
-    int pos_x=0, pos_y=0, id_creature=number_of_creatures+1;
-    wrap_add_creature_to_world( creature_cu, world_cu, id_matrix_cu, dim_creature, dim_world, pos_x, pos_y, id_creature, &number_of_creatures);
-    printf("Prima creatura aggiunta\n");
+    for(int i=0;i<number_of_creatures;i++){
 
-    pos_x=5; pos_y=5; id_creature=number_of_creatures+1;
-    wrap_add_creature_to_world( creature_cu, world_cu, id_matrix_cu, dim_creature, dim_world, pos_x, pos_y, id_creature, &number_of_creatures);
-    printf("Seconda creatura aggiunta\n");
+        controllo_errore_cuda("allocazione creatura",cudaMalloc( (void**)&creature_cu, dim_creature[i]*dim_creature[i]*sizeof(float) ));
+        controllo_errore_cuda("passaggio creatura su GPU",cudaMemcpyAsync( creature_cu, creature[i], dim_creature[i]*dim_creature[i]*sizeof(float), cudaMemcpyHostToDevice, stream ));
+        wrap_add_creature_to_world(creature_cu,mondo_cu,id_matrix_cu,dim_creature[i],dim_mondo,0,0,numero_creature+1,&numero_creature,stream);
+        controllo_errore_cuda("liberazione memoria creatura appena allocata in GPU",cudaFree(creature_cu));
 
+    }
 
-    //1: return world result for printing
-    cudaMemcpy( world, world_cu, dim_world*dim_world*sizeof(float), cudaMemcpyDeviceToHost );
-    cudaMemcpy( id_matrix, id_matrix_cu, dim_world*dim_world*sizeof(int), cudaMemcpyDeviceToHost );
+    controllo_errore_cuda("passaggio mondo su CPU",cudaMemcpyAsync( mondo, mondo_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToHost, stream ));
+    controllo_errore_cuda("passaggio id_matrix su CPU",cudaMemcpyAsync( id_matrix, id_matrix_cu, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyDeviceToHost, stream ));
 
-    //1: printing
-    printing_world("world post add creature",world,id_matrix,dim_world);
+    printing_world("Stampa del mondo dopo la aggiunta della creatura",mondo,id_matrix,dim_mondo);
 
-    //2: start convolution 
-    int *id_matrix_cu_out;
-    float *world_cu_out;
+    controllo_errore_cuda("allocazione filtro",cudaMalloc( (void**)&filtro_cu, dim_filtro*dim_filtro*sizeof(float) ));
+    controllo_errore_cuda("passaggio filtro su GPU",cudaMemcpyAsync( filtro_cu, filtro, dim_filtro*dim_filtro*sizeof(float), cudaMemcpyHostToDevice, stream ));
 
-    //2: allocation for convolution resault
-    cudaMalloc( (void**)&world_cu_out, dim_world*dim_world*sizeof(float) );
-    cudaMalloc( (void**)&id_matrix_cu_out, dim_world*dim_world*sizeof(int) );
+    float *mondo_out_cu;
+    int *id_matrix_out_cu;
 
-    //2: run convolution
-    wrap_convolution(world_cu, id_matrix_cu, filter_cu, world_cu_out, id_matrix_cu_out, dim_world, dim_filter, number_of_creatures);
+    controllo_errore_cuda("allocazione memoria mondo_out su GPU",cudaMalloc((void **) &mondo_out_cu,dim_mondo*dim_mondo*sizeof(float) ));
+    controllo_errore_cuda("allocazione memoria matrice_index_out su GPU",cudaMalloc((void **) &id_matrix_out_cu,dim_mondo*dim_mondo*sizeof(int) ));
 
-    //2: update world value with new value from convolution
-    cudaMemcpy( world_cu, world_cu_out, dim_world*dim_world*sizeof(float) ,cudaMemcpyDeviceToDevice );
-    cudaMemcpy( id_matrix_cu, id_matrix_cu_out, dim_world*dim_world*sizeof(int) ,cudaMemcpyDeviceToDevice );
+    wrap_convolution(mondo_cu,id_matrix_cu,filtro_cu,mondo_out_cu,id_matrix_out_cu,dim_mondo,dim_filtro,numero_creature,stream);
 
-    //2: return world result for printing
-    cudaMemcpy( world, world_cu, dim_world*dim_world*sizeof(float), cudaMemcpyDeviceToHost );
-    cudaMemcpy( id_matrix, id_matrix_cu, dim_world*dim_world*sizeof(int), cudaMemcpyDeviceToHost );
+    controllo_errore_cuda("passaggio world out alla GPU a world_cu",cudaMemcpyAsync( mondo_cu, mondo_out_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToDevice, stream ));
+    controllo_errore_cuda("passaggio id matrix alla GPU a id_matrix_cu",cudaMemcpyAsync( id_matrix_cu, id_matrix_out_cu, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyDeviceToDevice,stream ));
 
-    //2: printing
-    printing_world("world after convolution",world,id_matrix,dim_world);
+    controllo_errore_cuda("passaggio world out alla CPU",cudaMemcpyAsync( mondo, mondo_out_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToHost, stream ));
+    controllo_errore_cuda("passaggio id matrix alla CPU",cudaMemcpyAsync( id_matrix, id_matrix_out_cu, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyDeviceToHost, stream ));
 
-    //end: free memory (fine processo)
+    printing_world("mondo dopo la convouzione",mondo,id_matrix,dim_mondo);
 
-    free(world);
+    controllo_errore_cuda("liberazione memoria mondo_out GPU",cudaFree(mondo_out_cu));
+    controllo_errore_cuda("liberazione memoria id_matrix_out GPU",cudaFree(id_matrix_out_cu));
+    controllo_errore_cuda("liberazione memoria mondo GPU",cudaFree(mondo_cu));
+    controllo_errore_cuda("liberazione memoria id_matrix GPU",cudaFree(id_matrix_cu));
+    controllo_errore_cuda("liberazione memoria filtro GPU",cudaFree(filtro_cu));
+
+    free(mondo);
     free(id_matrix);
-    free(filter);
+    free(filtro);
+    free(creature);
 
-    cudaFree(world_cu);
-    cudaFree(id_matrix_cu);
-    cudaFree(filter_cu);
-    cudaFree(world_cu_out);
-    cudaFree(id_matrix_cu_out);
+    //cudaStreamDestroy(stream);
+
+}
+
+int main(){
+
+    char *nome_mondo = "data/world.txt", *nome_creatura="data/creature.txt", *nome_filtro="data/filter.txt";
+    char **creature = (char**) malloc(10 * sizeof(char*));
+    creature[0] = nome_creatura;
+
+    cudaStream_t vs[3];
+
+    for(int i=0;i<3;i++){
+        controllo_errore_cuda("creazione stream simulazione",cudaStreamCreate(&vs[i]));
+        simulazione(nome_mondo,nome_filtro,creature,1,vs[i]);
+    }
+
+    for(int i=0;i<3;i++){
+        cudaStreamSynchronize(vs[i]);
+        cudaStreamDestroy(vs[i]);
+    }
 
 }

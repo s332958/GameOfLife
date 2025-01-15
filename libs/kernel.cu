@@ -76,7 +76,7 @@ __global__ void add_creature_to_world(float* creature, float *world, int *id_mat
 
 extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *id_matrix, 
                                             int dim_creature, int dim_world, int pos_x, int pos_y, 
-                                            int creature_id, int *number_of_creaure){
+                                            int creature_id, int *number_of_creaure, cudaStream_t stream){
     
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
@@ -89,15 +89,15 @@ extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *i
     dim3 thread_number = dim3(n_block,n_block);
     dim3 block_number = dim3(n_thread,n_thread);
 
-    add_creature_to_world<<<block_number,thread_number>>>(creature,world,id_matrix,dim_creature,dim_world,pos_x,pos_y,creature_id);
+    add_creature_to_world<<<block_number,thread_number,0,stream>>>(creature,world,id_matrix,dim_creature,dim_world,pos_x,pos_y,creature_id);
     *number_of_creaure = *number_of_creaure+1;
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(stream);
     printf("wrap add creature: %s\n",cudaGetErrorString(cudaGetLastError()));
 
 }
 
 extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, float *world_out, int *id_matrix_out, 
-                            int dim_world, int dim_filter, int number_of_creatures){
+                            int dim_world, int dim_filter, int number_of_creatures, cudaStream_t stream){
 
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
@@ -110,8 +110,8 @@ extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, fl
     dim3 thread_number = dim3(n_block,n_block);
     dim3 block_number = dim3(n_thread,n_thread);
 
-    convolution<<<block_number,thread_number>>>(world,id_matrix,filter,world_out,id_matrix_out,dim_world,dim_filter,number_of_creatures);
-    cudaDeviceSynchronize();
+    convolution<<<block_number,thread_number,0,stream>>>(world,id_matrix,filter,world_out,id_matrix_out,dim_world,dim_filter,number_of_creatures);
+    cudaStreamSynchronize(stream);
     printf("wrap convolution: %s\n",cudaGetErrorString(cudaGetLastError()));
 
 }
