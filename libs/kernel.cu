@@ -62,35 +62,37 @@ __global__ void add_creature_to_world(float* creature, float *world, int *id_mat
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
 
-    //printf("Start (%d,%d): (dim: %d)\n",x,y,dim_creature);
     if (y>=dim_creature || x>=dim_creature) return;
 
     int world_x = (pos_x+x)%dim_world;
     int world_y = (pos_y+y)%dim_world;
 
     bool check_empty = !(bool)(id_matrix[ (world_y)*dim_world +(world_x) ]);
-    //printf("(%d,%d):%f \n",world_x,world_y,(float)check_empty);
 
     world[ (world_y)*dim_world +(world_x) ] += creature[ y*dim_creature + x ] * (float)check_empty;
     id_matrix[ (world_y)*dim_world +(world_x) ] = creature_id * (float)check_empty + id_matrix[ (world_y)*dim_world +(world_x) ] * (float)!check_empty;
 
 }
 
-extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *id_matrix, int dim_creature, int dim_world, int pos_x, int pos_y, int creature_id){
+extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *id_matrix, 
+                                            int dim_creature, int dim_world, int pos_x, int pos_y, 
+                                            int creature_id, int *number_of_creaure){
     
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
 
     int n_thread, n_block;
-    n_block = dim_creature/properties.maxThreadsDim[0] +1;
-    if(n_block==1) n_thread = dim_creature;
-    else n_thread = dim_creature/n_block +1;
+    n_block = dim_world/properties.maxThreadsDim[0] +1;
+    if(n_block==1) n_thread = dim_world;
+    else n_thread = dim_world/n_block +1;
 
     dim3 thread_number = dim3(n_block,n_block);
     dim3 block_number = dim3(n_thread,n_thread);
 
     add_creature_to_world<<<block_number,thread_number>>>(creature,world,id_matrix,dim_creature,dim_world,pos_x,pos_y,creature_id);
+    *number_of_creaure = *number_of_creaure+1;
     cudaDeviceSynchronize();
+    printf("wrap add creature: %s\n",cudaGetErrorString(cudaGetLastError()));
 
 }
 
@@ -110,5 +112,6 @@ extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, fl
 
     convolution<<<block_number,thread_number>>>(world,id_matrix,filter,world_out,id_matrix_out,dim_world,dim_filter,number_of_creatures);
     cudaDeviceSynchronize();
+    printf("wrap convolution: %s\n",cudaGetErrorString(cudaGetLastError()));
 
 }

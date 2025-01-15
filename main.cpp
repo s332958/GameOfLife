@@ -36,9 +36,14 @@ int main(){
     cudaMemcpy( creature_cu, creature, dim_creature*dim_creature*sizeof(float), cudaMemcpyHostToDevice );
 
     //1: add creatures to world 
-    int pos_x=0, pos_y=0, id_creature=1;
-    wrap_add_creature_to_world( creature_cu, world_cu, id_matrix_cu, dim_creature, dim_world, pos_x, pos_y, id_creature);
-    number_of_creatures++;
+    int pos_x=0, pos_y=0, id_creature=number_of_creatures+1;
+    wrap_add_creature_to_world( creature_cu, world_cu, id_matrix_cu, dim_creature, dim_world, pos_x, pos_y, id_creature, &number_of_creatures);
+    printf("Prima creatura aggiunta\n");
+
+    pos_x=5; pos_y=5; id_creature=number_of_creatures+1;
+    wrap_add_creature_to_world( creature_cu, world_cu, id_matrix_cu, dim_creature, dim_world, pos_x, pos_y, id_creature, &number_of_creatures);
+    printf("Seconda creatura aggiunta\n");
+
 
     //1: return world result for printing
     cudaMemcpy( world, world_cu, dim_world*dim_world*sizeof(float), cudaMemcpyDeviceToHost );
@@ -80,11 +85,5 @@ int main(){
     cudaFree(filter_cu);
     cudaFree(world_cu_out);
     cudaFree(id_matrix_cu_out);
-
-    float x = -1;
-    bool end = !(x+1);
-    float ris = 100 * end;
-
-    printf("end: %d, ris: %f \n",end,ris);
 
 }

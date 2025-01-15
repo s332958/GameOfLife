@@ -20,6 +20,7 @@ void readWorld(char *filename, int *dim_world, float **world, int **id_matrix) {
     for(int i=0;i<d*d;i++) {
         file>>(*world)[i];
         if((*world)[i]>0) (*id_matrix)[i]=-1;
+        else (*id_matrix)[i] = 0;
     }
     *dim_world = d;
 
