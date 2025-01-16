@@ -14,7 +14,8 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
     //compute cell to modify with convolution  (one thread per cell)
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
-
+    int cell_index = y*dim_world+x;
+    int ID = id_matrix[cell_index]
     //stop thread out of bound
     if (y>=dim_world || x>=dim_world) return;
 
@@ -74,14 +75,14 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
     final_point = fmaxf(0.0, fminf(1.0, world[cell_index] + (1.0 / T) * growth_value));
     final_point = final_point * 255.0f;
     */
-    int cell_index = y*dim_world+x;
+
 
     //check obstacles is used for decide wich cell need to be modify (obstacles cell remain the same)
-    bool check_obstacle = !(bool)(1 + id_matrix[cell_index]);
+    bool check_obstacle = !(bool)(1 + ID);
 
     //generate new world_matrix and matrix_id
     world_out[cell_index] = final_point*(!check_obstacle) + world[cell_index]*(check_obstacle);
-    id_matrix_out[cell_index] = final_id_cell*(!check_obstacle) + id_matrix[cell_index]*(check_obstacle);
+    id_matrix_out[cell_index] = final_id_cell*(!check_obstacle) + ID*(check_obstacle);
 
 }
 
