@@ -3,7 +3,7 @@ import cv2 as cv
 
 
 
-R = 15
+R = 9
 
 # Genera la griglia di coordinate
 y, x = np.ogrid[-R:R, -R:R]  # Genera due array per le coordinate
