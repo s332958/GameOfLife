@@ -1,0 +1,24 @@
+{
+    "version": 4,
+    "configurations": [
+        {
+            "name": "WSL",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerPath": "/usr/local/cuda/bin/nvcc",  // Percorso del compilatore CUDA
+            "includePath": [
+                "/usr/local/cuda/include", // Percorso delle intestazioni CUDA
+                "/usr/include/c++/13",  // Include C++ standard
+                "/usr/include/x86_64-linux-gnu/c++/13"
+            ],
+            "defines": [],
+            "browse": {
+                "path": [
+                    "/usr/local/cuda/include",
+                    "/usr/include/c++/13",
+                    "/usr/include/x86_64-linux-gnu/c++/13"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ]
+}

@@ -1,77 +1,163 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
-#include <stdlib.h>
+#include <cstdlib>
+#include <string>
 
-// Funzione principale per leggere il file
-void readWorld(char *filename, int *dim_world, float **world, int **id_matrix) {
+// Funzione per leggere una matrice da file e calcolare id_matrix
+void readWorld(const std::string& filename, int* dim_world, float** world, int** id_matrix) {
     std::ifstream file(filename);
-
     if (!file.is_open()) {
         std::cerr << "Errore nell'apertura del file!" << std::endl;
         return;
     }
     int d;
     file >> d;
-
-    *world = new float[d*d];
-    *id_matrix = new int[d * d];
-
-    for(int i=0;i<d*d;i++) {
-        file>>(*world)[i];
-        if((*world)[i]>0) (*id_matrix)[i]=-1;
-        else (*id_matrix)[i] = 0;
+    *world = (float*)malloc(d * d * sizeof(float));
+    *id_matrix = (int*)malloc(d * d * sizeof(int));
+    
+    for (int i = 0; i < d * d; i++) {
+        file >> (*world)[i];
+        (*id_matrix)[i] = ((*world)[i] > 0) ? -1 : 0;
     }
     *dim_world = d;
-
-    file.close();
 }
 
-void readMatrix(char *filename, int *dim, float **matrix){
+// Funzione per leggere una matrice da file
+void readMatrix(const std::string& filename, int* dim, float** matrix) {
     std::ifstream file(filename);
-
     if (!file.is_open()) {
         std::cerr << "Errore nell'apertura del file!" << std::endl;
         return;
     }
     int d;
     file >> d;
-
-    *matrix = new float[d*d];
-
-    for(int i=0;i<d*d;i++) {
-        file>>(*matrix)[i];
+    *matrix = (float*)malloc(d * d * sizeof(float));
+    
+    for (int i = 0; i < d * d; i++) {
+        file >> (*matrix)[i];
     }
     *dim = d;
-
-    file.close();
 }
 
-void printing_world(char* description, float *world, int *id_matrix, int dim_world){
-    std::cout<<"START PRINTING "<<description<<": \n\n";
-    for(int i=0; i<dim_world; i++){
-        for(int j=0; j<dim_world; j++){
-            std::cout<< std::setw(5) << world[i*dim_world + j] << " ";
+// Funzione per stampare la matrice world (DEBUG)
+void printing_world(const std::string& description, float* world, int* id_matrix, int dim_world) {
+    std::cout << "START PRINTING " << description << ":\n\n";
+    for (int i = 0; i < dim_world; i++) {
+        for (int j = 0; j < dim_world; j++) {
+            std::cout << std::setw(5) << world[i * dim_world + j] << " ";
         }
-        std::cout<<"\n";
+        std::cout << "\n";
     }
-    std::cout<<"\n";
-    for(int i=0; i<dim_world; i++){
-        for(int j=0; j<dim_world; j++){
-            std::cout<< std::setw(5) << id_matrix[i*dim_world + j] << " ";
+    std::cout << "\n";
+    for (int i = 0; i < dim_world; i++) {
+        for (int j = 0; j < dim_world; j++) {
+            std::cout << std::setw(5) << id_matrix[i * dim_world + j] << " ";
         }
-        std::cout<<"\n";
+        std::cout << "\n";
     }
-    std::cout<<"\n";
+    std::cout << "\n";
 }
 
-void printing_matrix(char* description, float *matrix, int dim){
-    std::cout<<"START PRINTING "<<description<<": \n\n";
-    for(int i=0; i<dim; i++){
-        for(int j=0; j<dim; j++){
-            std::cout<< std::setw(5) << matrix[i*dim+ j] << " ";
+// Funzione per stampare una matrice generica (DEBUG)
+void printing_matrix(const std::string& description, float* matrix, int dim) {
+    std::cout << "START PRINTING " << description << ":\n\n";
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
+            std::cout << std::setw(5) << matrix[i * dim + j] << " ";
         }
-        std::cout<<"\n";
+        std::cout << "\n";
     }
-    std::cout<<"\n";
+    std::cout << "\n";
+}
+
+// Funzione per svuotare un file
+void clear_file(const std::string& filename) {
+    std::ofstream file(filename, std::ios::out);
+    if (!file.is_open()) {
+        std::cerr << "Errore nell'apertura del file!" << std::endl;
+        return;
+    }
+    std::cout << "Il file " << filename << " è stato svuotato correttamente.\n";
+}
+
+// Funzione per creare e scrivere una matrice su file
+void create_matrix(const std::string& filename, int dim, int value) {
+    std::ofstream file(filename, std::ios::out);
+    if (!file.is_open()) {
+        std::cerr << "Errore nell'apertura del file!" << std::endl;
+        return;
+    }
+    file << dim << "\n";
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
+            file << value << " ";
+        }
+        file << "\n";
+    }
+}
+
+// Funzione per salvare una matrice su file
+void save_matrix_to_file(const std::string& filename, float* matrix, int dim) {
+    std::ofstream file(filename, std::ios::app);
+    if (!file.is_open()) {
+        std::cerr << "Errore nella creazione del file!" << std::endl;
+        return;
+    }
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
+            file << matrix[i * dim + j] << " ";
+        }
+        file << "\n";
+    }
+    file << "\n";
+    std::cout << "Matrice salvata correttamente in " << filename << "\n";
+}
+
+void save_matrix_to_file(const std::string& filename, int* matrix, int dim) {
+    std::ofstream file(filename, std::ios::app);
+    if (!file.is_open()) {
+        std::cerr << "Errore nella creazione del file!" << std::endl;
+        return;
+    }
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
+            file << matrix[i * dim + j] << " ";
+        }
+        file << "\n";
+    }
+    file << "\n";
+    std::cout << "Matrice salvata correttamente in " << filename << "\n";
+}
+
+// Funzione per salvare una matrice di tipo float in un file già aperto
+void save_matrix_to_file(std::ofstream& file, float* matrix, int dim) {
+    if (!file.is_open()) {
+        std::cerr << "Errore: il file non è aperto!" << std::endl;
+        return;
+    }
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
+            file << matrix[i * dim + j] << " ";
+        }
+        file << "\n";
+    }
+    file << "\n";
+    std::cout << "Matrice salvata correttamente nel file.\n";
+}
+
+// Funzione per salvare una matrice di tipo int in un file già aperto
+void save_matrix_to_file(std::ofstream& file, int* matrix, int dim) {
+    if (!file.is_open()) {
+        std::cerr << "Errore: il file non è aperto!" << std::endl;
+        return;
+    }
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
+            file << matrix[i * dim + j] << " ";
+        }
+        file << "\n";
+    }
+    file << "\n";
+    std::cout << "Matrice salvata correttamente nel file.\n";
 }

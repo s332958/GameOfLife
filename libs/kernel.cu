@@ -2,33 +2,41 @@
 #include <iostream>
 #include "kernel.cuh"
 
-#define MAX_CREATURES 1024
+#define MAX_CREATURES 64
+//types of obstacles in the world (setup for 1 type)
 #define WORLD_OBJECT 1
 
+//function for convolution
 __global__ void convolution(float *world, int *id_matrix, float* filter, float *world_out, int *id_matrix_out, 
                             int dim_world, int dim_filter, int number_of_creatures)
     {
 
+    //compute cell to modify with convolution  (one thread per cell)
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
 
+    //stop thread out of bound
     if (y>=dim_world || x>=dim_world) return;
 
     // 0 obstacle contribution, 1 world contribution, 1> creature contribution
     int dim_points = number_of_creatures+WORLD_OBJECT+1;
     float points[MAX_CREATURES] = {};
 
+    //compute limit of filter
     int lim = dim_filter/2;
 
     for(int i = -lim; i<=lim; i++){
         for(int j = -lim; j<=lim; j++){
 
+            //compute cell index of neighbors in toroidal world
             int world_y = ((i + y + dim_world) % dim_world);
             int world_x = ((j + x + dim_world) % dim_world);
 
+            //get cell neighbors and filter cell on that cell
             int world_cell = world_y * dim_world + world_x;
             int filter_cell = (lim + i) * dim_filter + (lim + j);
 
+            //compute vector of contribution from creatures and obstacles for the cell
             int world_id_cell_contribution = id_matrix[world_cell] + WORLD_OBJECT;
             float value_contribution = filter[filter_cell] * world[world_cell];
             points[world_id_cell_contribution] += value_contribution;
@@ -36,7 +44,8 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
         }
     }
 
-    //compute max contribution from creatures and contribution from obstacles and world (the last 2 contributes are unused by default)
+    //compute max contribution from creatures, obstacles and world (world  and obstacles contributes are unused by default)
+    //the greater contribution of creture give the cell id
     float final_point=0;
     int final_id_cell=0;
     int first_creature = WORLD_OBJECT+1;
@@ -47,8 +56,27 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
         }
     }
     final_point += (points[0]*0 + points[1]*0);
+    
+    
+    
+    /*
+    bell = lambda x, m, s: np.exp(- ((x-m)/s)**2 / 2)
+        m = 0.135
+        s = 0.015
+    return bell(U, m, s)*2-1
+    */
 
+    //activation function
+    /*
+    float m = 0.35, s = 0.015, T = 10;
+    final_point = final_point / 255.0f;
+    float growth_value = exp(-pow((final_point - m) / s, 2) / 2) * 255.0f;
+    final_point = fmaxf(0.0, fminf(1.0, world[cell_index] + (1.0 / T) * growth_value));
+    final_point = final_point * 255.0f;
+    */
     int cell_index = y*dim_world+x;
+
+    //check obstacles is used for decide wich cell need to be modify (obstacles cell remain the same)
     bool check_obstacle = !(bool)(1 + id_matrix[cell_index]);
 
     //generate new world_matrix and matrix_id
@@ -57,23 +85,30 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
 }
 
+//function for add creture
 __global__ void add_creature_to_world(float* creature, float *world, int *id_matrix, int dim_creature, int dim_world, int pos_x, int pos_y, int creature_id){
 
+    //compute cell to modify with convolution  (one thread per cell)
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
 
+    //stop thread out of bound
     if (y>=dim_creature || x>=dim_creature) return;
 
+    //compute cell index in toroidal world
     int world_x = (pos_x+x)%dim_world;
     int world_y = (pos_y+y)%dim_world;
 
+    //check looking for empty cell 
     bool check_empty = !(bool)(id_matrix[ (world_y)*dim_world +(world_x) ]);
 
+    //update only empty cell (if they are already ocupated ignore them)
     world[ (world_y)*dim_world +(world_x) ] += creature[ y*dim_creature + x ] * (float)check_empty;
     id_matrix[ (world_y)*dim_world +(world_x) ] = creature_id * (float)check_empty + id_matrix[ (world_y)*dim_world +(world_x) ] * (float)!check_empty;
 
 }
 
+//function for prepare and launch add creture
 extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *id_matrix, 
                                             int dim_creature, int dim_world, int pos_x, int pos_y, 
                                             int creature_id, int *number_of_creaure, cudaStream_t stream){
@@ -81,6 +116,7 @@ extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *i
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
 
+    //computation number of thread and block for launch kernel (use max thread for dimension before launch new block)
     int n_thread, n_block;
     n_block = dim_world/properties.maxThreadsDim[0] +1;
     if(n_block==1) n_thread = dim_world;
@@ -88,7 +124,8 @@ extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *i
 
     dim3 thread_number = dim3(n_block,n_block);
     dim3 block_number = dim3(n_thread,n_thread);
-
+    
+    //launch kernel for adding creature to world
     add_creature_to_world<<<block_number,thread_number,0,stream>>>(creature,world,id_matrix,dim_creature,dim_world,pos_x,pos_y,creature_id);
     *number_of_creaure = *number_of_creaure+1;
     cudaStreamSynchronize(stream);
@@ -96,12 +133,14 @@ extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *i
 
 }
 
+//function for prepare and launch convolution
 extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, float *world_out, int *id_matrix_out, 
                             int dim_world, int dim_filter, int number_of_creatures, cudaStream_t stream){
 
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
-    
+
+    //computation number of thread and block for launch kernel (use max thread for dimension before launch new block)
     int n_thread, n_block;
     n_block = dim_world/properties.maxThreadsDim[0] +1;
     if(n_block==1) n_thread = dim_world;
@@ -110,6 +149,7 @@ extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, fl
     dim3 thread_number = dim3(n_block,n_block);
     dim3 block_number = dim3(n_thread,n_thread);
 
+     //launch kernel for adding creature to world
     convolution<<<block_number,thread_number,0,stream>>>(world,id_matrix,filter,world_out,id_matrix_out,dim_world,dim_filter,number_of_creatures);
     cudaStreamSynchronize(stream);
     printf("wrap convolution: %s\n",cudaGetErrorString(cudaGetLastError()));
