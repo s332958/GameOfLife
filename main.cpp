@@ -123,7 +123,7 @@ int main(){
     std::string nome_mondo = "data/worlds/mondo.txt", nome_creatura = "data/creatures/creatura.txt", nome_filtro = "data/filters/filter.txt";
     std::vector<std::string> creature(MAX_CREATURE);
     std::vector<Posizione> posizioni(MAX_CREATURE);
-    int numero_creature = 10;
+    int numero_creature = 6;
 
     for(int i=0; i<numero_creature; i++){
         creature[i] = nome_creatura;
@@ -132,7 +132,7 @@ int main(){
 
     cudaStream_t vs[3];
     int numero_stream = 1;
-    int numero_convoluzioni = 300;
+    int numero_convoluzioni = 50;
 
     // Creazione degli stream
     for(int i = 0; i < numero_stream; i++){

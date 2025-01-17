@@ -21,10 +21,10 @@ K = (D < 1) * bell(D, 0.5, 0.15)
 K = K / np.sum(K)
 
 # Normalizza il kernel per visualizzarlo
-K_normalized = cv.normalize(K, None, 0, 255, cv.NORM_MINMAX).astype(np.uint8)
+#K_normalized = cv.normalize(K, None, 0, 255, cv.NORM_MINMAX).astype(np.uint8)
 
 # Mostra il kernel
-np.savetxt('data/kernel_filter.txt.txt', K_normalized, fmt='%d', delimiter=' ')
+np.savetxt('data/filters/filter.txt', K, fmt='%f', delimiter=' ')
 #cv.imshow("Kernel", K_normalized)
 #cv.waitKey(0)
 #cv.destroyAllWindows()

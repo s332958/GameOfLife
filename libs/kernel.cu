@@ -15,7 +15,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
     int cell_index = y*dim_world+x;
-    int ID = id_matrix[cell_index]
+    int ID = id_matrix[cell_index];
     //stop thread out of bound
     if (y>=dim_world || x>=dim_world) return;
 
@@ -36,11 +36,18 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
             //get cell neighbors and filter cell on that cell
             int world_cell = world_y * dim_world + world_x;
             int filter_cell = (lim + i) * dim_filter + (lim + j);
-
+            float value_contribution = filter[filter_cell] * world[world_cell]/255.0f;
             //compute vector of contribution from creatures and obstacles for the cell
-            int world_id_cell_contribution = id_matrix[world_cell] + WORLD_OBJECT;
-            float value_contribution = filter[filter_cell] * world[world_cell];
-            points[world_id_cell_contribution] += value_contribution;
+
+            if(ID==0){
+                int world_id_cell_contribution = id_matrix[world_cell] + WORLD_OBJECT; 
+                points[world_id_cell_contribution] += value_contribution;                 
+            }
+            else{
+                int world_id_cell_contribution = ID + WORLD_OBJECT;
+                points[world_id_cell_contribution] += (!(bool)(ID - id_matrix[world_cell]))*value_contribution;
+                //printf("%d",!(bool)(ID - id_matrix[world_cell]));
+            }
 
         }
     }
@@ -56,9 +63,8 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
             final_id_cell = i-WORLD_OBJECT;
         }
     }
-    final_point += (points[0]*0 + points[1]*0);
-    
-    
+    //final_point += (points[0]*0 + points[1]*0);
+
     
     /*
     bell = lambda x, m, s: np.exp(- ((x-m)/s)**2 / 2)
@@ -68,21 +74,20 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
     */
 
     //activation function
-    /*
+    
     float m = 0.35, s = 0.015, T = 10;
-    final_point = final_point / 255.0f;
-    float growth_value = exp(-pow((final_point - m) / s, 2) / 2) * 255.0f;
+    float growth_value = exp(-pow((final_point - m) / s, 2) / 2)*2-1;
     final_point = fmaxf(0.0, fminf(1.0, world[cell_index] + (1.0 / T) * growth_value));
     final_point = final_point * 255.0f;
-    */
+    
 
 
     //check obstacles is used for decide wich cell need to be modify (obstacles cell remain the same)
-    bool check_obstacle = !(bool)(1 + ID);
+    //bool check_obstacle = !(bool)(1 + ID);
 
     //generate new world_matrix and matrix_id
-    world_out[cell_index] = final_point*(!check_obstacle) + world[cell_index]*(check_obstacle);
-    id_matrix_out[cell_index] = final_id_cell*(!check_obstacle) + ID*(check_obstacle);
+    world_out[cell_index] = final_point;                      //*(!check_obstacle)+ world[cell_index]*(check_obstacle);
+    id_matrix_out[cell_index] = (int)final_id_cell;                  //*(!check_obstacle) + ID*(check_obstacle);
 
 }
 
