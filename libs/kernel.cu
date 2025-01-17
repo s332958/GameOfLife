@@ -25,6 +25,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
     //compute limit of filter
     int lim = dim_filter/2;
+    float kernelsum = 0;
 
     for(int i = -lim; i<=lim; i++){
         for(int j = -lim; j<=lim; j++){
@@ -36,58 +37,76 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
             //get cell neighbors and filter cell on that cell
             int world_cell = world_y * dim_world + world_x;
             int filter_cell = (lim + i) * dim_filter + (lim + j);
-            float value_contribution = filter[filter_cell] * world[world_cell]/255.0f;
+            float value_contribution = filter[filter_cell] * world[world_cell]/255;
             //compute vector of contribution from creatures and obstacles for the cell
-
-            if(ID==0){
-                int world_id_cell_contribution = id_matrix[world_cell] + WORLD_OBJECT; 
-                points[world_id_cell_contribution] += value_contribution;                 
-            }
-            else{
-                int world_id_cell_contribution = ID + WORLD_OBJECT;
-                points[world_id_cell_contribution] += (!(bool)(ID - id_matrix[world_cell]))*value_contribution;
-                //printf("%d",!(bool)(ID - id_matrix[world_cell]));
-            }
-
+            int world_id_cell_contribution = id_matrix[world_cell] + WORLD_OBJECT; 
+            points[world_id_cell_contribution] += value_contribution; 
+            kernelsum += filter[filter_cell];
         }
     }
-
+    
     //compute max contribution from creatures, obstacles and world (world  and obstacles contributes are unused by default)
     //the greater contribution of creture give the cell id
-    float final_point=0;
-    int final_id_cell=0;
+    float final_point = 0;
+    int final_id_cell = ID;
     int first_creature = WORLD_OBJECT+1;
-    for(int i=first_creature;i<dim_points;i++){
-        if(final_point<points[i]){
-            final_point = points[i];
-            final_id_cell = i-WORLD_OBJECT;
-        }
-    }
-    //final_point += (points[0]*0 + points[1]*0);
+
 
     
-    /*
-    bell = lambda x, m, s: np.exp(- ((x-m)/s)**2 / 2)
-        m = 0.135
-        s = 0.015
-    return bell(U, m, s)*2-1
-    */
+    if(ID==0){
+        for(int i=first_creature;i<dim_points;i++){
+            if(final_point<points[i]){
+                final_point = points[i];
+                final_id_cell = i-WORLD_OBJECT;
+            }
+        }
+    }
+    else{
+        float enemy = 0;
+        for(int i=first_creature;i<dim_points;i++){
+            if(ID != (i-WORLD_OBJECT)){
+                enemy += points[i];
+            }
+        }
+        final_point = points[ID + WORLD_OBJECT] - enemy;
+    }
+      
+
+    //final_point += (points[0]*0 + points[1]*0);
+
 
     //activation function
     
-    float m = 0.35, s = 0.015, T = 10;
-    float growth_value = exp(-pow((final_point - m) / s, 2) / 2)*2-1;
-    final_point = fmaxf(0.0, fminf(1.0, world[cell_index] + (1.0 / T) * growth_value));
-    final_point = final_point * 255.0f;
-    
+    //float m = 0.35, s = 0.015, T = 10;
+    float m = 0.35, s = 0.015, T = 100;
+    float growth_value = exp(-pow(((final_point - m) / s)/ 2, 2) )*2-1;
+    float increment = (1.0 / T) * growth_value;
+    final_point = fmaxf(0.0, fminf(1.0, world[cell_index] + increment)); 
 
+    final_point = final_point*255;    
 
+    if (final_point == 0){
+        final_id_cell = 0;
+    }
+
+    /*
+    if(cell_index == 100){
+        int size = sizeof(points) / sizeof(points[1]);
+        for (int i = 0; i < size; i++) {
+            printf("%.2f, ", points[i]);
+        }
+        printf(" | ");
+        printf("     %f     ",world[cell_index]);
+        printf("     %f     ",final_point);
+        printf("     %f     ",kernelsum);
+    }
+    */
     //check obstacles is used for decide wich cell need to be modify (obstacles cell remain the same)
     //bool check_obstacle = !(bool)(1 + ID);
-
+    //printf("| %f %d |", final_point ,final_id_cell );
     //generate new world_matrix and matrix_id
-    world_out[cell_index] = final_point;                      //*(!check_obstacle)+ world[cell_index]*(check_obstacle);
-    id_matrix_out[cell_index] = (int)final_id_cell;                  //*(!check_obstacle) + ID*(check_obstacle);
+    world_out[cell_index] = (int)final_point;                      //*(!check_obstacle)+ world[cell_index]*(check_obstacle);
+    id_matrix_out[cell_index] = final_id_cell;                  //*(!check_obstacle) + ID*(check_obstacle);
 
 }
 
