@@ -25,7 +25,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
     //compute limit of filter
     int lim = dim_filter/2;
-    float kernelsum = 0;
+    //float kernelsum = 0;
 
     for(int i = -lim; i<=lim; i++){
         for(int j = -lim; j<=lim; j++){
@@ -40,8 +40,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
             float value_contribution = filter[filter_cell] * world[world_cell]/255;
             //compute vector of contribution from creatures and obstacles for the cell
             int world_id_cell_contribution = id_matrix[world_cell] + WORLD_OBJECT; 
-            points[world_id_cell_contribution] += value_contribution; 
-            kernelsum += filter[filter_cell];
+            points[world_id_cell_contribution] += value_contribution;            
         }
     }
     
@@ -64,32 +63,34 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
     else{
         float enemy = 0;
         for(int i=first_creature;i<dim_points;i++){
-            if(ID != (i-WORLD_OBJECT)){
-                enemy += points[i];
+            if(ID != i){
+                enemy += points[i + WORLD_OBJECT];
             }
         }
         final_point = points[ID + WORLD_OBJECT] - enemy;
     }
       
 
-    //final_point += (points[0]*0 + points[1]*0);
+
 
 
     //activation function
     
-    //float m = 0.35, s = 0.015, T = 10;
-    float m = 0.35, s = 0.015, T = 100;
-    float growth_value = exp(-pow(((final_point - m) / s)/ 2, 2) )*2-1;
+    float m = 0.35, s = 0.08, T = 10;
+    float growth_value = exp(-pow(((final_point - m) / s),2)/ 2 )*2-1;
     float increment = (1.0 / T) * growth_value;
-    final_point = fmaxf(0.0, fminf(1.0, world[cell_index] + increment)); 
+    final_point = fmaxf(0.0, fminf(1.0, world[cell_index]/255 + increment)); 
 
-    final_point = final_point*255;    
+    final_point = final_point*255;   
 
     if (final_point == 0){
         final_id_cell = 0;
     }
 
     /*
+    if(final_id_cell != 0){
+        printf("%.6f", increment);
+    } 
     if(cell_index == 100){
         int size = sizeof(points) / sizeof(points[1]);
         for (int i = 0; i < size; i++) {

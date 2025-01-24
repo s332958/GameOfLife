@@ -132,7 +132,7 @@ int main(){
 
     cudaStream_t vs[3];
     int numero_stream = 1;
-    int numero_convoluzioni = 200;
+    int numero_convoluzioni = 2000;
 
     // Creazione degli stream
     for(int i = 0; i < numero_stream; i++){
