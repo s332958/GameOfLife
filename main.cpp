@@ -93,6 +93,10 @@ void simulazione(const std::string& world_name, const std::string& filter_name, 
     controllo_errore_cuda("allocazione memoria matrice_index_out su GPU", cudaMalloc((void**)&id_matrix_out_cu, dim_mondo*dim_mondo*sizeof(int)));
 
     for(int i = 0; i < numbers_of_convolution; i++){
+        clock_t start, end;
+        double gpu_time_used;
+        start = clock();
+
         wrap_convolution(mondo_cu, id_matrix_cu, filtro_cu, mondo_out_cu, id_matrix_out_cu, dim_mondo, dim_filtro, numero_creature, stream);
 
         controllo_errore_cuda("passaggio world out alla GPU a world_cu", cudaMemcpyAsync(mondo_cu, mondo_out_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToDevice, stream));
@@ -103,6 +107,10 @@ void simulazione(const std::string& world_name, const std::string& filter_name, 
 
         save_matrix_to_file(file_mondo, mondo, dim_mondo);
         save_matrix_to_file(file_id_matrix, id_matrix, dim_mondo);
+
+        end = clock();
+        gpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+        printf("Tempo di esecuzione: %.5f secondi\n", gpu_time_used);
     }
 
     controllo_errore_cuda("liberazione memoria mondo_out GPU", cudaFree(mondo_out_cu));
@@ -120,19 +128,21 @@ void simulazione(const std::string& world_name, const std::string& filter_name, 
 int main(){
     const int MAX_CREATURE = 64;
 
-    std::string nome_mondo = "data/worlds/mondo.txt", nome_creatura = "data/creatures/creatura.txt", nome_filtro = "data/filters/filter.txt";
+    std::string nome_mondo = "data/worlds/mondo.txt", nome_creatura = "data/creatures/creatura_", nome_filtro = "data/filters/filter.txt";
     std::vector<std::string> creature(MAX_CREATURE);
     std::vector<Posizione> posizioni(MAX_CREATURE);
-    int numero_creature = 4;
+    int numero_creature = 16;
 
     for(int i=0; i<numero_creature; i++){
-        creature[i] = nome_creatura;
-        posizioni[i] = Posizione(0+(i/5)*100,0+(i%5)*100);
+        std::string nome_creatura_agg = nome_creatura + std::to_string(i+1) + ".txt";
+        creature[i] = nome_creatura_agg;
+        posizioni[i] = Posizione(0+(i/4)*128,0+(i%4)*128);
+        
     }
 
     cudaStream_t vs[3];
     int numero_stream = 1;
-    int numero_convoluzioni = 2000;
+    int numero_convoluzioni = 200;
 
     // Creazione degli stream
     for(int i = 0; i < numero_stream; i++){

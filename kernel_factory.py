@@ -1,7 +1,7 @@
 import numpy as np
 import cv2 as cv
 
-size = 15
+size = 31
 
 # Parametro della dimensione del kernel
 def RingKernel():
