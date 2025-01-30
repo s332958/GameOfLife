@@ -128,13 +128,13 @@ extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *i
     cudaGetDeviceProperties(&properties,0);
 
     //computation number of thread and block for launch kernel (use max thread for dimension before launch new block)
-    int n_thread, n_block;
-    n_block = dim_world/properties.maxThreadsDim[0] +1;
-    if(n_block==1) n_thread = dim_world;
-    else n_thread = dim_world/n_block +1;
+    int n_thread_per_block = properties.maxThreadsPerBlock;  
+    int thread_per_dimension = sqrt(n_thread_per_block);
+    int n_block_x = dim_world / thread_per_dimension +1; 
+    int n_block_y = dim_world / thread_per_dimension +1;  
 
-    dim3 thread_number = dim3(n_block,n_block);
-    dim3 block_number = dim3(n_thread,n_thread);
+    dim3 thread_number = dim3(thread_per_dimension, thread_per_dimension);  
+    dim3 block_number = dim3(n_block_x, n_block_y); 
     
     //launch kernel for adding creature to world
     add_creature_to_world<<<block_number,thread_number,0,stream>>>(creature,world,id_matrix,dim_creature,dim_world,pos_x,pos_y,creature_id);

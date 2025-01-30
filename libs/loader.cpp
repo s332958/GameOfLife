@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <cstdlib>
 #include <string>
+#include "loader.h"
 
 // Funzione per leggere una matrice da file e calcolare id_matrix
 void readWorld(const std::string& filename, int* dim_world, float** world, int** id_matrix) {
@@ -72,7 +73,7 @@ void printing_matrix(const std::string& description, float* matrix, int dim) {
 }
 
 // Funzione per svuotare un file
-void clear_file(const std::string& filename, bool debug=false){
+void clear_file(const std::string& filename, bool debug){
     std::ofstream file(filename, std::ios::out);
     if (!file.is_open()) {
         std::cerr << "Errore nell'apertura del file!" << std::endl;
@@ -98,7 +99,7 @@ void create_matrix(const std::string& filename, int dim, int value) {
 }
 
 // Funzione per salvare una matrice su file
-void save_matrix_to_file(const std::string& filename, float* matrix, int dim, bool debug=false) {
+void save_matrix_to_file(const std::string& filename, float* matrix, int dim, bool debug) {
     std::ofstream file(filename, std::ios::app);
     if (!file.is_open()) {
         std::cerr << "Errore nella creazione del file!" << std::endl;
@@ -114,7 +115,7 @@ void save_matrix_to_file(const std::string& filename, float* matrix, int dim, bo
     if(debug) std::cout << "Matrice salvata correttamente in " << filename << "\n";
 }
 
-void save_matrix_to_file(const std::string& filename, int* matrix, int dim, bool debug=false){
+void save_matrix_to_file(const std::string& filename, int* matrix, int dim, bool debug){
     std::ofstream file(filename, std::ios::app);
     if (!file.is_open()) {
         std::cerr << "Errore nella creazione del file!" << std::endl;
@@ -131,7 +132,7 @@ void save_matrix_to_file(const std::string& filename, int* matrix, int dim, bool
 }
 
 // Funzione per salvare una matrice di tipo float in un file già aperto
-void save_matrix_to_file(std::ofstream& file, float* matrix, int dim, bool debug=false ) {
+void save_matrix_to_file(std::ofstream& file, float* matrix, int dim, bool debug ) {
     if (!file.is_open()) {
         std::cerr << "Errore: il file non è aperto!" << std::endl;
         return;
@@ -147,7 +148,7 @@ void save_matrix_to_file(std::ofstream& file, float* matrix, int dim, bool debug
 }
 
 // Funzione per salvare una matrice di tipo int in un file già aperto
-void save_matrix_to_file(std::ofstream& file, int* matrix, int dim, bool debug=false ) {
+void save_matrix_to_file(std::ofstream& file, int* matrix, int dim, bool debug ) {
     if (!file.is_open()) {
         std::cerr << "Errore: il file non è aperto!" << std::endl;
         return;
@@ -160,4 +161,39 @@ void save_matrix_to_file(std::ofstream& file, int* matrix, int dim, bool debug=f
     }
     file << "\n";
     if(debug) std::cout << "Matrice salvata correttamente nel file.\n";
+}
+
+//funzione per la lettura delle configurazioni del programma
+std::vector<SimulationSetup> readConfiguration(std::string fileName){
+
+    std::vector<SimulationSetup> risultato;
+    std::ifstream file(fileName);
+    if (!file.is_open()) {
+        std::cerr << "Errore nella lettura del file di configurazione!" << std::endl;
+        return risultato;
+    }
+    
+    while(!file.eof()){
+        if(file){
+            int numberCreatures;
+            std::string worldName, filterName;
+            file >> worldName;
+            file >> filterName;
+            file >> numberCreatures;
+            SimulationSetup sim(worldName,filterName);
+            for(int i=0;i<numberCreatures;i++){
+                int posX, posY;
+                std::string creatureName;
+                file >> creatureName;
+                file >> posX;
+                file >> posY;
+                sim.addCreatureName(creatureName,posX,posY);
+            }
+            risultato.push_back(sim);
+        }
+    }
+    
+    file.close();
+    return risultato;
+
 }

@@ -16,7 +16,7 @@ void controllo_errore_cuda(const std::string& descrizione, cudaError_t errore){
     printf("%s: %s\n",descrizione.c_str(),cudaGetErrorString(errore));
 }
 
-void simulazione(const std::string& world_name, const std::string& filter_name, const std::vector<std::string>& creature_names, 
+void simulazione(std::string& world_name, std::string& filter_name, std::vector<std::string>& creature_names, 
                  int id_simulation, std::vector<Posizione> posizioni, int number_of_creatures, int numbers_of_convolution, 
                  cudaStream_t stream, std::ofstream& file_mondo, std::ofstream& file_id_matrix){
 
@@ -106,53 +106,62 @@ void simulazione(const std::string& world_name, const std::string& filter_name, 
     free(creature);
 }
 
-int main(){
-
-    clock_t start = clock();
+int main() {
+    clock_t start = clock();  // Start time
 
     const int MAX_CREATURE = 64;
 
-    std::string nome_mondo = "data/worlds/mondo.txt", nome_creatura = "data/creatures/creatura_", nome_filtro = "data/filters/filter.txt";
-    std::vector<std::string> creature(MAX_CREATURE);
-    std::vector<Posizione> posizioni(MAX_CREATURE);
-    int numero_creature = 16;
+    // Leggi la configurazione
+    std::vector<SimulationSetup> simulationSetup = readConfiguration("data/configurations/configuration.txt");
+    int numero_stream = simulationSetup.size();  // Numero stream in base al numero di configurazioni
 
-    for(int i=0; i<numero_creature; i++){
-        std::string nome_creatura_agg = nome_creatura + std::to_string(i+1) + ".txt";
-        creature[i] = nome_creatura_agg;
-        posizioni[i] = Posizione(0+(i/4)*128,0+(i%4)*128);
-    }
-
-    cudaStream_t vs[3];
-    int numero_stream = 3;
+    // Dichiarazione degli stream CUDA
+    cudaStream_t vs[10];  // Numero di stream massimo
     int numero_convoluzioni = 200;
 
+    std::cout << "Numero di simulazioni: " << numero_stream << std::endl;
+
     // Creazione degli stream
-    for(int i = 0; i < numero_stream; i++){
+    for (int i = 0; i < numero_stream; i++) {
         controllo_errore_cuda("creazione stream simulazione", cudaStreamCreate(&vs[i]));
 
         // Creazione dei file per output
         std::string nome_file_output_mondo = "data/output/mondo" + std::to_string(i) + ".txt";
         std::string nome_file_output_id_matrix = "data/output/id_matrix" + std::to_string(i) + ".txt";
-        clear_file(nome_file_output_mondo);
+        
+        clear_file(nome_file_output_mondo);  // Assicurati che questa funzione sia definita
         clear_file(nome_file_output_id_matrix);
+
         std::ofstream file_mondo(nome_file_output_mondo, std::ios::app);
         std::ofstream file_id_matrix(nome_file_output_id_matrix, std::ios::app);
 
-        // Chiamata alla simulazione con file aperti
-        simulazione(nome_mondo, nome_filtro, creature, i, posizioni, numero_creature, numero_convoluzioni, vs[i], file_mondo, file_id_matrix);
+        // Chiamata alla simulazione con i parametri corretti
+        simulazione(
+            simulationSetup[i].worldName,
+            simulationSetup[i].filterName,
+            simulationSetup[i].creatureListNames,  
+            i,
+            simulationSetup[i].creturesPositions,
+            simulationSetup[i].numberCreatures,
+            numero_convoluzioni,
+            vs[i],
+            file_mondo,
+            file_id_matrix
+        );
 
         // Chiusura dei file
         file_mondo.close();
         file_id_matrix.close();
     }
 
-    for(int i = 0; i < numero_stream; i++){
+    // Sincronizzazione e distruzione degli stream
+    for (int i = 0; i < numero_stream; i++) {
         cudaStreamSynchronize(vs[i]);
         cudaStreamDestroy(vs[i]);
     }
 
-    clock_t end = clock();
-    std::cout << "Tempo esecuzione programma: " << (end-start)%CLOCKS_PER_SEC << std::endl;
+    clock_t end = clock();  // End time
+    std::cout << "Tempo esecuzione programma: " << (end - start) / CLOCKS_PER_SEC << " secondi" << std::endl;
 
+    return 0;
 }

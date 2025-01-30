@@ -39,6 +39,7 @@ class SimulationSetup{
         int numberCreatures;
         std::string worldName, filterName;
         std::vector<std::string> creatureListNames;
+        std::vector<Posizione> creturesPositions;
 
         SimulationSetup(std::string worldNameFile, std::string filterNameFile){
             worldName = worldNameFile;
@@ -46,11 +47,12 @@ class SimulationSetup{
             numberCreatures = 0;
         }
 
-        void addCreatureName(std::string creatureName){
+        void addCreatureName(std::string creatureName, int posx, int posy){
             creatureListNames.push_back(creatureName);
+            creturesPositions.push_back(Posizione(posx,posy));
             numberCreatures++;
         }
 
 };
 
-
+std::vector<SimulationSetup> readConfiguration(std::string fileName);

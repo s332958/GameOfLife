@@ -28,6 +28,10 @@ def mappa_colori(id):
     Esempio:
     0 -> bianco, 1 -> rosso, 2 -> blu, ecc.
     """
+    # Se l'ID è negativo o superiore a 63, assegniamo un valore predefinito (nero)
+    if id < 0 or id > 63:
+        id = 64
+
     colormap = {
         0: (255, 255, 255),        # Bianco
         1: (255, 0, 0),            # Rosso
@@ -92,10 +96,10 @@ def mappa_colori(id):
         60: (255, 99, 71),         # Tomato
         61: (128, 0, 0),           # Rosso scuro
         62: (255, 140, 0),         # Arancio
-        63: (0, 0, 139)            # Blu marino scuro
+        63: (0, 0, 139),           # Blu marino scuro
+        64: (255, 255, 255)        # Bianco (per ostacoli)
     }
-    # Restituisce il colore di default (bianco) se l'ID non è trovato
-    return colormap.get(id, (255, 255, 255))
+    return colormap.get(id, (255, 255, 255))  # Restituisce bianco come colore di fallback
 
 # Funzione per aggiornare l'animazione
 def aggiorna(frame, matrici1, matrici2, img, ax):
@@ -110,8 +114,12 @@ def aggiorna(frame, matrici1, matrici2, img, ax):
     immagine_colori = np.zeros((matrice_corrente_1.shape[0], matrice_corrente_1.shape[1], 3), dtype=np.uint8)
 
     # Crea una mappa di colori per gli ID
-    colori = np.array([mappa_colori(id) for id in range(64)])  # 64 possibili ID per i colori
-    colori_id = colori[matrice_corrente_2]  # Applica la mappa di colori agli ID
+    colori = np.array([mappa_colori(id) for id in range(65)])  # 64 possibili ID per i colori
+
+    # Assicurati che i valori di matrice_corrente_2 siano compresi tra 0 e 64
+    matrice_corrente_2 = np.clip(matrice_corrente_2, 0, 64)
+
+    colori_id = colori[matrice_corrente_2] 
 
     # Aggiungi la nitidezza (luminosità) alla saturazione del colore
     immagine_colori = (colori_id * (matrice_corrente_1[:, :, np.newaxis] / 255)).astype(np.uint8)
@@ -122,8 +130,8 @@ def aggiorna(frame, matrici1, matrici2, img, ax):
 
 if __name__ == "__main__":
 
-    file_path1 = "data/output/mondo0.txt"  # Percorso del file della matrice 1 (nitidezza)
-    file_path2 = "data/output/id_matrix0.txt"  # Percorso del file della matrice 2 (ID)
+    file_path1 = "data/output/mondo1.txt"  # Percorso del file della matrice 1 (nitidezza)
+    file_path2 = "data/output/id_matrix1.txt"  # Percorso del file della matrice 2 (ID)
 
     # Leggi entrambe le matrici
     matrici1 = leggi_matrici(file_path1)
@@ -141,7 +149,7 @@ if __name__ == "__main__":
         aggiorna, 
         fargs=(matrici1, matrici2, img, ax),
         frames=len(matrici1), 
-        interval=20,  # Durata di ogni frame in millisecondi
+        interval=1000,  # Durata di ogni frame in millisecondi
         blit=True
     )
 

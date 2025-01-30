@@ -1,0 +1,15 @@
+data/worlds/mondo.txt
+data/filters/filter.txt
+4
+data/creatures/creatura_1.txt 0 0
+data/creatures/creatura_2.txt 128 128
+data/creatures/creatura_3.txt 128 0
+data/creatures/creatura_4.txt 0 128
+
+data/worlds/world_small.txt
+data/filters/filter_small.txt
+4
+data/creatures/creature_small.txt 0 0
+data/creatures/creature_small.txt 3 0
+data/creatures/creature_small.txt 0 3
+data/creatures/creature_small.txt 3 3
