@@ -1,5 +1,6 @@
 #include "libs/loader.h"
 #include "libs/kernel.cuh"
+
 #include <cuda_runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,28 +11,8 @@
 
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
 
-class Posizione {
-public:
-    int x;
-    int y;
-
-    // Costruttore
-    Posizione(int x_val = 0, int y_val = 0) : x(x_val), y(y_val) {}
-
-    // Metodo per ottenere la posizione x
-    int getX() const { return x; }
-
-    // Metodo per ottenere la posizione y
-    int getY() const { return y; }
-
-    // Metodo per settare la posizione x
-    void setX(int x_val) { x = x_val; }
-
-    // Metodo per settare la posizione y
-    void setY(int y_val) { y = y_val; }
-};
-
 void controllo_errore_cuda(const std::string& descrizione, cudaError_t errore){
+    if(errore==cudaError::cudaSuccess) return;
     printf("%s: %s\n",descrizione.c_str(),cudaGetErrorString(errore));
 }
 
@@ -126,6 +107,9 @@ void simulazione(const std::string& world_name, const std::string& filter_name, 
 }
 
 int main(){
+
+    clock_t start = clock();
+
     const int MAX_CREATURE = 64;
 
     std::string nome_mondo = "data/worlds/mondo.txt", nome_creatura = "data/creatures/creatura_", nome_filtro = "data/filters/filter.txt";
@@ -137,11 +121,10 @@ int main(){
         std::string nome_creatura_agg = nome_creatura + std::to_string(i+1) + ".txt";
         creature[i] = nome_creatura_agg;
         posizioni[i] = Posizione(0+(i/4)*128,0+(i%4)*128);
-        
     }
 
     cudaStream_t vs[3];
-    int numero_stream = 1;
+    int numero_stream = 3;
     int numero_convoluzioni = 200;
 
     // Creazione degli stream
@@ -168,5 +151,8 @@ int main(){
         cudaStreamSynchronize(vs[i]);
         cudaStreamDestroy(vs[i]);
     }
+
+    clock_t end = clock();
+    std::cout << "Tempo esecuzione programma: " << (end-start)%CLOCKS_PER_SEC << std::endl;
 
 }

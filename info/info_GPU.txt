@@ -1,0 +1,29 @@
+============================================
+  📌 Informazioni sulla GPU (Device 0)
+============================================
+🔹 Nome del dispositivo: NVIDIA GeForce 930MX
+🔹 Compute Capability: 5.0
+🔹 Multiprocessori (SMs): 3
+🔹 Frequenza di clock: 901.50 MHz
+
+💾 Memoria:
+-------------------------------
+🔸 Memoria globale: 1.96 GB
+🔸 Memoria condivisa per blocco: 48.00 KB
+🔸 Memoria costante: 64.00 KB
+🔸 Larghezza della banda della memoria: 64-bit
+
+🧵 Thread & Blocchi:
+-------------------------------
+🔸 Numero massimo di thread per blocco: 1024
+🔸 Dimensione massima del blocco: (1024, 1024, 64)
+🔸 Dimensione massima della griglia: (2147483647, 65535, 65535)
+
+📌 Proprietà avanzate:
+-------------------------------
+🔸 Warp size: 32
+🔸 Numero massimo di warps per SM: 64
+🔸 Concurrent Kernels: Sì
+🔸 Unified Addressing: Sì
+
+============================================

@@ -72,13 +72,13 @@ void printing_matrix(const std::string& description, float* matrix, int dim) {
 }
 
 // Funzione per svuotare un file
-void clear_file(const std::string& filename) {
+void clear_file(const std::string& filename, bool debug=false){
     std::ofstream file(filename, std::ios::out);
     if (!file.is_open()) {
         std::cerr << "Errore nell'apertura del file!" << std::endl;
         return;
     }
-    std::cout << "Il file " << filename << " è stato svuotato correttamente.\n";
+    if(debug) std::cout << "Il file " << filename << " è stato svuotato correttamente.\n";
 }
 
 // Funzione per creare e scrivere una matrice su file
@@ -98,7 +98,7 @@ void create_matrix(const std::string& filename, int dim, int value) {
 }
 
 // Funzione per salvare una matrice su file
-void save_matrix_to_file(const std::string& filename, float* matrix, int dim) {
+void save_matrix_to_file(const std::string& filename, float* matrix, int dim, bool debug=false) {
     std::ofstream file(filename, std::ios::app);
     if (!file.is_open()) {
         std::cerr << "Errore nella creazione del file!" << std::endl;
@@ -111,10 +111,10 @@ void save_matrix_to_file(const std::string& filename, float* matrix, int dim) {
         file << "\n";
     }
     file << "\n";
-    std::cout << "Matrice salvata correttamente in " << filename << "\n";
+    if(debug) std::cout << "Matrice salvata correttamente in " << filename << "\n";
 }
 
-void save_matrix_to_file(const std::string& filename, int* matrix, int dim) {
+void save_matrix_to_file(const std::string& filename, int* matrix, int dim, bool debug=false){
     std::ofstream file(filename, std::ios::app);
     if (!file.is_open()) {
         std::cerr << "Errore nella creazione del file!" << std::endl;
@@ -127,11 +127,11 @@ void save_matrix_to_file(const std::string& filename, int* matrix, int dim) {
         file << "\n";
     }
     file << "\n";
-    std::cout << "Matrice salvata correttamente in " << filename << "\n";
+    if(debug) std::cout << "Matrice salvata correttamente in " << filename << "\n";
 }
 
 // Funzione per salvare una matrice di tipo float in un file già aperto
-void save_matrix_to_file(std::ofstream& file, float* matrix, int dim) {
+void save_matrix_to_file(std::ofstream& file, float* matrix, int dim, bool debug=false ) {
     if (!file.is_open()) {
         std::cerr << "Errore: il file non è aperto!" << std::endl;
         return;
@@ -143,11 +143,11 @@ void save_matrix_to_file(std::ofstream& file, float* matrix, int dim) {
         file << "\n";
     }
     file << "\n";
-    std::cout << "Matrice salvata correttamente nel file.\n";
+    if(debug) std::cout << "Matrice salvata correttamente nel file.\n";
 }
 
 // Funzione per salvare una matrice di tipo int in un file già aperto
-void save_matrix_to_file(std::ofstream& file, int* matrix, int dim) {
+void save_matrix_to_file(std::ofstream& file, int* matrix, int dim, bool debug=false ) {
     if (!file.is_open()) {
         std::cerr << "Errore: il file non è aperto!" << std::endl;
         return;
@@ -159,5 +159,5 @@ void save_matrix_to_file(std::ofstream& file, int* matrix, int dim) {
         file << "\n";
     }
     file << "\n";
-    std::cout << "Matrice salvata correttamente nel file.\n";
+    if(debug) std::cout << "Matrice salvata correttamente nel file.\n";
 }

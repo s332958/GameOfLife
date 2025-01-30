@@ -121,7 +121,8 @@ __global__ void add_creature_to_world(float* creature, float *world, int *id_mat
 //function for prepare and launch add creture
 extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *id_matrix, 
                                             int dim_creature, int dim_world, int pos_x, int pos_y, 
-                                            int creature_id, int *number_of_creaure, cudaStream_t stream){
+                                            int creature_id, int *number_of_creaure, cudaStream_t stream
+                                            ){
     
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
@@ -139,13 +140,14 @@ extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *i
     add_creature_to_world<<<block_number,thread_number,0,stream>>>(creature,world,id_matrix,dim_creature,dim_world,pos_x,pos_y,creature_id);
     *number_of_creaure = *number_of_creaure+1;
     cudaStreamSynchronize(stream);
-    printf("wrap add creature: %s\n",cudaGetErrorString(cudaGetLastError()));
+    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("wrap add creature: %s\n",cudaGetErrorString(cudaGetLastError()));
 
 }
 
 //function for prepare and launch convolution
 extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, float *world_out, int *id_matrix_out, 
-                            int dim_world, int dim_filter, int number_of_creatures, cudaStream_t stream){
+                                    int dim_world, int dim_filter, int number_of_creatures, cudaStream_t stream
+                                ){
 
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
@@ -161,6 +163,6 @@ extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, fl
      //launch kernel for adding creature to world
     convolution<<<block_number,thread_number,0,stream>>>(world,id_matrix,filter,world_out,id_matrix_out,dim_world,dim_filter,number_of_creatures);
     cudaStreamSynchronize(stream);
-    printf("wrap convolution: %s\n",cudaGetErrorString(cudaGetLastError()));
+    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("wrap convolution: %s\n",cudaGetErrorString(cudaGetLastError()));
 
 }
