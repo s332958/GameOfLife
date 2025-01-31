@@ -52,11 +52,11 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
         float final_point = 0;
         int final_id_cell = ID;
         int first_creature = WORLD_OBJECT+1;
-
+        
         float best_point = 0;
         float enemy = 0;
         int best_creature = 0;
-        bool libero = !ID;
+        bool libero = ID==0;
 
         for(int i=first_creature;i<dim_points;i++){
             bool greater = points[i] - best_point > 0;
@@ -69,7 +69,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
         final_point = libero * best_point + !libero * (points[ ID+WORLD_OBJECT ] - enemy);
         final_id_cell = libero * (best_creature-WORLD_OBJECT) + !libero * final_id_cell;
-
+        
         /*
         if(ID==0){
             for(int i=first_creature;i<dim_points;i++){
@@ -88,8 +88,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
             }
             final_point = points[ID + WORLD_OBJECT] - enemy;
         }
-
-        */
+        */ 
 
         //activation function        
         //float m = 0.135, s = 0.015, T = 10;
@@ -106,7 +105,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
         }
         */
 
-        bool alive = final_point > 0.0001;
+        bool alive = final_point>0;
         final_id_cell = alive * final_id_cell;
 
         world_out[cell_index] = (int)final_point;                   
@@ -130,13 +129,15 @@ __global__ void add_creature_to_world(float* creature, float *world, int *id_mat
     //compute cell index in toroidal world
     int world_x = (pos_x+x)%dim_world;
     int world_y = (pos_y+y)%dim_world;
+    int world_cell = (world_y)*dim_world +(world_x);
 
     //check looking for empty cell 
-    bool check_empty = !(bool)(id_matrix[ (world_y)*dim_world +(world_x) ]);
+    bool check_empty = !(bool)(id_matrix[ world_cell ]);
 
     //update only empty cell (if they are already ocupated ignore them)
-    world[ (world_y)*dim_world +(world_x) ] += creature[ y*dim_creature + x ] * (float)check_empty;
-    id_matrix[ (world_y)*dim_world +(world_x) ] = creature_id * (float)check_empty + id_matrix[ (world_y)*dim_world +(world_x) ] * (float)!check_empty;
+    world[ world_cell ] += creature[ y*dim_creature + x ] * (float)check_empty;
+    bool alive = world[ world_cell ];
+    id_matrix[ world_cell ] = alive * creature_id * (float)check_empty + id_matrix[ world_cell ] * (float)!check_empty;
 
 }
 
