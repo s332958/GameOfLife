@@ -1,7 +1,7 @@
 import numpy as np
 import cv2 as cv
 
-size = 31
+size = 11
 
 # Parametro della dimensione del kernel
 def RingKernel():
@@ -46,7 +46,7 @@ K_normalized = cv.normalize(kernel, None, 0, 255, cv.NORM_MINMAX).astype(np.uint
 with open('data/filters/filter.txt', 'w') as f:
     f.write(f"{size}\n")  # Scrive il valore di size e va a capo
     np.savetxt(f, kernel, fmt='%f', delimiter=' ')  # Scrive la matrice
-#cv.imshow("Kernel", K_normalized)
-#cv.waitKey(0)
-#cv.destroyAllWindows()
+cv.imshow("Kernel", K_normalized)
+cv.waitKey(0)
+cv.destroyAllWindows()
 

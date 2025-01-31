@@ -23,3 +23,8 @@
                     0.00%     593ns         2     296ns      90ns     503ns  cuDeviceGet
                     0.00%     273ns         1     273ns     273ns     273ns  cuModuleGetLoadingMode
                     0.00%     174ns         1     174ns     174ns     174ns  cuDeviceGetUuid
+
+
+
+Tempo esecuzione programma: 138 secondi
+Tempo esecuzione programma: 132 secondi

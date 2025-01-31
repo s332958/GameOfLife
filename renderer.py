@@ -130,8 +130,8 @@ def aggiorna(frame, matrici1, matrici2, img, ax):
 
 if __name__ == "__main__":
 
-    file_path1 = "data/output/mondo1.txt"  # Percorso del file della matrice 1 (nitidezza)
-    file_path2 = "data/output/id_matrix1.txt"  # Percorso del file della matrice 2 (ID)
+    file_path1 = "data/output/mondo0.txt"  # Percorso del file della matrice 1 (nitidezza)
+    file_path2 = "data/output/id_matrix0.txt"  # Percorso del file della matrice 2 (ID)
 
     # Leggi entrambe le matrici
     matrici1 = leggi_matrici(file_path1)
@@ -149,7 +149,7 @@ if __name__ == "__main__":
         aggiorna, 
         fargs=(matrici1, matrici2, img, ax),
         frames=len(matrici1), 
-        interval=1000,  # Durata di ogni frame in millisecondi
+        interval=20,  # Durata di ogni frame in millisecondi
         blit=True
     )
 
