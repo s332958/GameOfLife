@@ -126,7 +126,7 @@ int main() {
 
     // Dichiarazione degli stream CUDA
     cudaStream_t vs[10];  // Numero di stream massimo
-    int numero_convoluzioni = 10;
+    int numero_convoluzioni = 500;
 
     std::cout << "Numero di simulazioni: " << numero_stream << std::endl;
 

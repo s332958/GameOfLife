@@ -99,7 +99,7 @@ if __name__ == "__main__":
         aggiorna, 
         fargs=(matrici1, matrici2, img, ax),
         frames=len(matrici1), 
-        interval=20,  
+        interval=0,  
         blit=True
     )
 

@@ -38,7 +38,6 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
     int world_cell = world_y * dim_world + world_x;
 
     //non faccio conti se sto lavorando su un ostacolo oppure prendo i contributi da un ostacolo o se la cella e' vuota
-    if(id_matrix[world_cell]==-1 || id_matrix[cell_index]==-1 || id_matrix[world_cell]==0) return;
 
     //controllo se l'id della cella da modificare è libero e calcolo quale matrice filtro va usata di conseguenza
     //se libera prendo il filtro della creatura che da il contributo, se occupata prendo il filtro della creatura che occupa
@@ -50,7 +49,10 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
     int world_id_cell_contribution = id_matrix[world_cell] + WORLD_OBJECT; 
 
+    if(id_matrix[cell_index]!=-1 || id_matrix[world_cell]!=-1 || id_matrix[world_cell]!=0){
+
     atomicAdd(&points[world_id_cell_contribution],value_contribution);            
+    }
 
     __syncthreads();
 
@@ -79,7 +81,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
         //activation function        
         //float m = 0.135, s = 0.015, T = 10;
-        float m = 0.135, s = 0.1, T = 100;
+        float m = 0.135, s = 0.1, T = 10;
         float growth_value = exp(-pow(((final_point - m) / s),2)/ 2 )*2-1;
         float increment = (1.0 / T) * growth_value;
         final_point = fmaxf(0.0, fminf(1.0, world[cell_index]/255 + increment)); 
