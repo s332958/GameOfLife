@@ -29,6 +29,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     int *id_matrix;
 
     creature = (float**) malloc(number_of_creatures*sizeof(float*));
+    filtri = (float**) malloc(number_of_creatures*sizeof(float*));
     dim_creature = (int*) malloc(number_of_creatures*sizeof(int));
 
     std::string nome_mondo = world_name;
@@ -39,11 +40,6 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
         std::string nome_filtro = filters_name[i];
         readMatrix(nome_filtro.c_str(), &dim_filtro, &filtri[i]);
         readMatrix(nome_creatura.c_str(), &dim_creature[i], &creature[i]);
-    }
-
-    for(int i=0;i<number_of_creatures;i++) {
-        std::cout << "Matrice Filtro " << i <<"\n";
-        printing_matrix("",filtri[i],dim_filtro);
     }
 
     int numero_creature = 0;
@@ -91,8 +87,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
         
         //filtro cu dovrebbe contenere tutti i filtri salvati in modo contiguo
         wrap_convolution(mondo_cu, id_matrix_cu, filtro_cu, mondo_out_cu, id_matrix_out_cu, dim_mondo, dim_filtro, numero_creature, stream);
-        std::cout << "Errore nella convoluzione: " << cudaGetErrorString(cudaGetLastError()) << "\n";
-
+        
         controllo_errore_cuda("passaggio world out alla GPU a world_cu", cudaMemcpyAsync(mondo_cu, mondo_out_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToDevice, stream));
         controllo_errore_cuda("passaggio id matrix alla GPU a id_matrix_cu", cudaMemcpyAsync(id_matrix_cu, id_matrix_out_cu, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyDeviceToDevice, stream));
 
@@ -108,15 +103,11 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     }
     controllo_errore_cuda("Sincronizzazione Stream dopo convoluzioni",cudaStreamSynchronize(stream));
 
-    printf("inizio le free");
-
     controllo_errore_cuda("liberazione memoria mondo_out GPU", cudaFree(mondo_out_cu));
     controllo_errore_cuda("liberazione memoria id_matrix_out GPU", cudaFree(id_matrix_out_cu));
     controllo_errore_cuda("liberazione memoria mondo GPU", cudaFree(mondo_cu));
     controllo_errore_cuda("liberazione memoria id_matrix GPU", cudaFree(id_matrix_cu));
     controllo_errore_cuda("liberazione memoria filtro GPU", cudaFree(filtro_cu));
-
-    printf("finite le free");
 
     free(mondo);
     free(id_matrix);
@@ -132,10 +123,6 @@ int main() {
     // Leggi la configurazione
     std::vector<SimulationSetup> simulationSetup = readConfiguration("data/configurations/configuration.txt");
     int numero_stream = simulationSetup.size();  // Numero stream in base al numero di configurazioni
-
-    for(int i=0;i<numero_stream;i++){
-        std::cout << simulationSetup[i].toString();
-    }
 
     // Dichiarazione degli stream CUDA
     cudaStream_t vs[10];  // Numero di stream massimo
