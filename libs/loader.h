@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include <sstream>
 
 void readWorld(const std::string& filename, int* dim, float** matrix, int** id_matrix);
 void readMatrix(const std::string& filename, int* dim, float** matrix);
@@ -37,20 +38,32 @@ class SimulationSetup{
 
     public:
         int numberCreatures;
-        std::string worldName, filterName;
-        std::vector<std::string> creatureListNames;
+        std::string worldName;
+        std::vector<std::string> creatureListNames, creatureFilterListName;
         std::vector<Posizione> creturesPositions;
 
-        SimulationSetup(std::string worldNameFile, std::string filterNameFile){
+        SimulationSetup(std::string worldNameFile){
             worldName = worldNameFile;
-            filterName = filterNameFile;
             numberCreatures = 0;
         }
 
-        void addCreatureName(std::string creatureName, int posx, int posy){
+        void addCreatureName(std::string creatureName, int posx, int posy, std::string filter){
             creatureListNames.push_back(creatureName);
             creturesPositions.push_back(Posizione(posx,posy));
+            creatureFilterListName.push_back(filter);
             numberCreatures++;
+        }
+
+        std::string toString(){
+            std::ostringstream oss;
+            oss << "World Name: " << worldName << "\n";
+            oss << "Number of Creatures: " << numberCreatures << "\n";
+            for (size_t i = 0; i < creatureListNames.size(); i++) {
+                oss << "  Creature " << i + 1 << ": " << creatureListNames[i] 
+                    << " (Filter: " << creatureFilterListName[i] 
+                    << ", Position: [" << creturesPositions[i].getX() << ", " << creturesPositions[i].getY() << "])\n";
+            }
+            return oss.str();
         }
 
 };

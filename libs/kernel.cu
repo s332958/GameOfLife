@@ -35,9 +35,17 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
     int world_x = ((centro_x + filtro_x + dim_world) % dim_world);
     int world_y = ((centro_y + filtro_y + dim_world) % dim_world);
-
     int world_cell = world_y * dim_world + world_x;
-    int filter_cell = (radius_filter + filtro_y) * dim_filter + (radius_filter + filtro_x);
+
+    //non faccio conti se sto lavorando su un ostacolo oppure prendo i contributi da un ostacolo o se la cella e' vuota
+    if(id_matrix[world_cell]==-1 || id_matrix[cell_index]==-1 || id_matrix[world_cell]==0) return;
+
+    //controllo se l'id della cella da modificare è libero e calcolo quale matrice filtro va usata di conseguenza
+    //se libera prendo il filtro della creatura che da il contributo, se occupata prendo il filtro della creatura che occupa
+    bool libero = ID==0;
+    int id_filter = id_matrix[cell_index]*(!libero) + id_matrix[world_cell]*(libero);
+
+    int filter_cell = (radius_filter + filtro_y) * dim_filter + (radius_filter + filtro_x) + id_filter*dim_filter*dim_filter;
     float value_contribution = filter[filter_cell] * world[world_cell]/255;
 
     int world_id_cell_contribution = id_matrix[world_cell] + WORLD_OBJECT; 
@@ -56,7 +64,6 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
         float best_point = 0;
         float enemy = 0;
         int best_creature = 0;
-        bool libero = ID==0;
 
         for(int i=first_creature;i<dim_points;i++){
             bool greater = points[i] - best_point > 0;
@@ -69,26 +76,6 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
         final_point = libero * best_point + !libero * (points[ ID+WORLD_OBJECT ] - enemy);
         final_id_cell = libero * (best_creature-WORLD_OBJECT) + !libero * final_id_cell;
-        
-        /*
-        if(ID==0){
-            for(int i=first_creature;i<dim_points;i++){
-                if(final_point<points[i]){
-                    final_point = points[i];
-                    final_id_cell = i-WORLD_OBJECT;
-                }
-            }
-        }
-        else{
-            float enemy = 0;
-            for(int i=first_creature;i<dim_points;i++){
-                if(ID != i){
-                    enemy += points[i + WORLD_OBJECT];
-                }
-            }
-            final_point = points[ID + WORLD_OBJECT] - enemy;
-        }
-        */ 
 
         //activation function        
         //float m = 0.135, s = 0.015, T = 10;
@@ -98,12 +85,6 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
         final_point = fmaxf(0.0, fminf(1.0, world[cell_index]/255 + increment)); 
 
         final_point = final_point*255;   
-        
-        /*
-        if (final_point == 0){
-            final_id_cell = 0;
-        }
-        */
 
         bool alive = final_point>0;
         final_id_cell = alive * final_id_cell;

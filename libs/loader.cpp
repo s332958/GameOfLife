@@ -178,16 +178,16 @@ std::vector<SimulationSetup> readConfiguration(std::string fileName){
             int numberCreatures;
             std::string worldName, filterName;
             file >> worldName;
-            file >> filterName;
             file >> numberCreatures;
-            SimulationSetup sim(worldName,filterName);
+            SimulationSetup sim(worldName);
             for(int i=0;i<numberCreatures;i++){
                 int posX, posY;
                 std::string creatureName;
                 file >> creatureName;
                 file >> posX;
                 file >> posY;
-                sim.addCreatureName(creatureName,posX,posY);
+                file >> filterName;
+                sim.addCreatureName(creatureName,posX,posY,filterName);
             }
             risultato.push_back(sim);
         }
