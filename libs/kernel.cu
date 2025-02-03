@@ -20,7 +20,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
     int ID = id_matrix[cell_index];
     
     //stop thread out of bound
-    if (centro_x>=dim_world || centro_y>=dim_world || filtro_x + radius_filter>=dim_filter || filtro_y + radius_filter>=dim_filter) return;
+    //if (centro_x>=dim_world || centro_y>=dim_world || filtro_x + radius_filter>=dim_filter || filtro_y + radius_filter>=dim_filter) return;
 
     int dim_points = number_of_creatures+WORLD_OBJECT+1;
 
@@ -49,7 +49,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
     int world_id_cell_contribution = id_matrix[world_cell] + WORLD_OBJECT; 
 
-    if(id_matrix[cell_index]!=-1 || id_matrix[world_cell]!=-1 || id_matrix[world_cell]!=0){
+    if(id_matrix[cell_index]!=-1 && id_matrix[world_cell]!=-1){//&& id_matrix[world_cell]!=0
 
     atomicAdd(&points[world_id_cell_contribution],value_contribution);            
     }
