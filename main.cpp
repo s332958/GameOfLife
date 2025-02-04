@@ -47,14 +47,14 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     float *mondo_cu, *filtro_cu, *creature_cu;
     int *id_matrix_cu;
 
-    controllo_errore_cuda("allocazione mondo", cudaMalloc((void**)&mondo_cu, dim_mondo*dim_mondo*sizeof(float)));
-    controllo_errore_cuda("allocazione id_matrix", cudaMalloc((void**)&id_matrix_cu, dim_mondo*dim_mondo*sizeof(int)));
+    controllo_errore_cuda("allocazione mondo", cudaMallocAsync((void**)&mondo_cu, dim_mondo*dim_mondo*sizeof(float),stream));
+    controllo_errore_cuda("allocazione id_matrix", cudaMallocAsync((void**)&id_matrix_cu, dim_mondo*dim_mondo*sizeof(int),stream));
 
     controllo_errore_cuda("passaggio mondo su GPU", cudaMemcpyAsync(mondo_cu, mondo, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyHostToDevice, stream));
     controllo_errore_cuda("passaggio id_matrix su GPU", cudaMemcpyAsync(id_matrix_cu, id_matrix, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyHostToDevice, stream));
 
     for(int i = 0; i < number_of_creatures; i++){
-        controllo_errore_cuda("allocazione creatura", cudaMalloc((void**)&creature_cu, dim_creature[i]*dim_creature[i]*sizeof(float)));
+        controllo_errore_cuda("allocazione creatura", cudaMallocAsync((void**)&creature_cu, dim_creature[i]*dim_creature[i]*sizeof(float),stream));
         controllo_errore_cuda("passaggio creatura su GPU", cudaMemcpyAsync(creature_cu, creature[i], dim_creature[i]*dim_creature[i]*sizeof(float), cudaMemcpyHostToDevice, stream));
         wrap_add_creature_to_world(creature_cu, mondo_cu, id_matrix_cu, dim_creature[i], dim_mondo, posizioni[i].getX(), posizioni[i].getY(), numero_creature+1, &numero_creature, stream);
         controllo_errore_cuda("liberazione memoria creatura appena allocata in GPU", cudaFree(creature_cu));
@@ -68,7 +68,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     controllo_errore_cuda("Sincronizzazione Stream dopo aggiunta creature",cudaStreamSynchronize(stream));
 
     //Possibile problema non so se alloca bene i filtri
-    controllo_errore_cuda("allocazione filtro", cudaMalloc((void**)&filtro_cu, dim_filtro*dim_filtro*sizeof(float)*number_of_creatures));
+    controllo_errore_cuda("allocazione filtro", cudaMallocAsync((void**)&filtro_cu, dim_filtro*dim_filtro*sizeof(float)*number_of_creatures,stream));
     for(int i=0; i<number_of_creatures; i++){
         controllo_errore_cuda("passaggio filtro i su GPU", cudaMemcpyAsync(filtro_cu+(dim_filtro*dim_filtro*i), filtri[i], dim_filtro*dim_filtro*sizeof(float), cudaMemcpyHostToDevice, stream));
     }
@@ -77,8 +77,8 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     float *mondo_out_cu;
     int *id_matrix_out_cu;
 
-    controllo_errore_cuda("allocazione memoria mondo_out su GPU", cudaMalloc((void**)&mondo_out_cu, dim_mondo*dim_mondo*sizeof(float)));
-    controllo_errore_cuda("allocazione memoria matrice_index_out su GPU", cudaMalloc((void**)&id_matrix_out_cu, dim_mondo*dim_mondo*sizeof(int)));
+    controllo_errore_cuda("allocazione memoria mondo_out su GPU", cudaMallocAsync((void**)&mondo_out_cu, dim_mondo*dim_mondo*sizeof(float),stream));
+    controllo_errore_cuda("allocazione memoria matrice_index_out su GPU", cudaMallocAsync((void**)&id_matrix_out_cu, dim_mondo*dim_mondo*sizeof(int),stream));
 
     for(int i = 0; i < numbers_of_convolution; i++){
         clock_t start, end;
@@ -103,16 +103,49 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     }
     controllo_errore_cuda("Sincronizzazione Stream dopo convoluzioni",cudaStreamSynchronize(stream));
 
+    float *creature_value_tot, *creature_value_tot_cu;
+    int *creature_occupation, *creature_occupation_cu;
+    int n_creature_obstacles = number_of_creatures + 2;
+
+    creature_value_tot = (float*) malloc(sizeof(float)*n_creature_obstacles);
+    creature_occupation = (int*) malloc(sizeof(int)*n_creature_obstacles);
+
+    for(int i=0;i<n_creature_obstacles;i++){
+        creature_value_tot[i] = 0.0;
+        creature_occupation[i] = 0;
+        printf("%d: val: %f occ: %d \n",i,creature_value_tot[i],creature_occupation[i]);
+    }
+
+    controllo_errore_cuda("Allocazione memoria creature occupation GPU", cudaMallocAsync((void**) &creature_occupation_cu,sizeof(int)*n_creature_obstacles,stream));
+    controllo_errore_cuda("Allocazione memoria creature tot value GPU", cudaMallocAsync((void**) &creature_value_tot_cu,sizeof(float)*n_creature_obstacles,stream));
+
+    controllo_errore_cuda("Spostamento creature value tot da CPU a GPU", cudaMemcpyAsync(creature_value_tot_cu,creature_value_tot,sizeof(float)*n_creature_obstacles,cudaMemcpyHostToDevice,stream));
+    controllo_errore_cuda("Spostamento creature occupation da CPU a GPU", cudaMemcpyAsync(creature_occupation_cu,creature_occupation,sizeof(int)*n_creature_obstacles,cudaMemcpyHostToDevice,stream));
+
+    wrap_creature_evaluation(mondo_cu,id_matrix,creature_occupation_cu,creature_value_tot_cu,dim_mondo,numero_creature,stream);
+    controllo_errore_cuda("Sincronizzazione Stream dopo valutazione",cudaStreamSynchronize(stream));
+
+    controllo_errore_cuda("Spostamento creature value tot da GPU a CPU", cudaMemcpyAsync(creature_value_tot,creature_value_tot_cu,sizeof(float)*n_creature_obstacles,cudaMemcpyDeviceToHost,stream));
+    controllo_errore_cuda("Spostamento creature occupation da GPU a CPU", cudaMemcpyAsync(creature_occupation,creature_occupation_cu,sizeof(int)*n_creature_obstacles,cudaMemcpyDeviceToHost,stream));
+
+    for(int i=0; i<n_creature_obstacles;i++){
+        std::cout << "Creature " << i-1 << ": " << "cell ocupation: " << creature_occupation[i] << " total value: " << creature_value_tot[i] << "\n";
+    }
+
     controllo_errore_cuda("liberazione memoria mondo_out GPU", cudaFree(mondo_out_cu));
     controllo_errore_cuda("liberazione memoria id_matrix_out GPU", cudaFree(id_matrix_out_cu));
     controllo_errore_cuda("liberazione memoria mondo GPU", cudaFree(mondo_cu));
     controllo_errore_cuda("liberazione memoria id_matrix GPU", cudaFree(id_matrix_cu));
     controllo_errore_cuda("liberazione memoria filtro GPU", cudaFree(filtro_cu));
+    controllo_errore_cuda("liberazione memoria creature occupation GPU", cudaFree(creature_occupation_cu));
+    controllo_errore_cuda("liberazione memoria creature value to GPU", cudaFree(creature_value_tot_cu));
 
     free(mondo);
     free(id_matrix);
     free(filtri);
     free(creature);
+    free(creature_value_tot);
+    free(creature_occupation);
 }
 
 int main() {
@@ -126,7 +159,7 @@ int main() {
 
     // Dichiarazione degli stream CUDA
     cudaStream_t vs[10];  // Numero di stream massimo
-    int numero_convoluzioni = 200;
+    int numero_convoluzioni = 1;
 
     std::cout << "Numero di simulazioni: " << numero_stream << std::endl;
 

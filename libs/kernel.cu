@@ -142,10 +142,10 @@ extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *i
     dim3 thread_number = dim3(thread_per_dimension, thread_per_dimension);  
     dim3 block_number = dim3(n_block, n_block); 
     
-    //launch kernel for adding creature to world
+    //launch kernel
     add_creature_to_world<<<block_number,thread_number,0,stream>>>(creature,world,id_matrix,dim_creature,dim_world,pos_x,pos_y,creature_id);
     *number_of_creaure = *number_of_creaure+1;
-    cudaStreamSynchronize(stream);
+    //cudaStreamSynchronize(stream);
     if(cudaGetLastError()!=cudaError::cudaSuccess) printf("wrap add creature: %s\n",cudaGetErrorString(cudaGetLastError()));
 
 }
@@ -161,9 +161,85 @@ extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, fl
     dim3 thread_number = dim3(dim_filter,dim_filter);
     dim3 block_number = dim3(dim_world,dim_world);
 
-     //launch kernel for adding creature to world
+    //launch kernel 
     convolution<<<block_number,thread_number,0,stream>>>(world,id_matrix,filter,world_out,id_matrix_out,dim_world,dim_filter,number_of_creatures);
-    cudaStreamSynchronize(stream);
+    //cudaStreamSynchronize(stream);
     if(cudaGetLastError()!=cudaError::cudaSuccess) printf("wrap convolution: %s\n",cudaGetErrorString(cudaGetLastError()));
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+__global__ void creature_evaluation(
+    float *world, int *id_matrix,
+    int *creature_occupations, float *creature_values,
+    int number_of_creatures, int dim_world
+){
+    
+    int tx = threadIdx.x + blockDim.x * blockIdx.x;
+    int ty = threadIdx.y + blockDim.y * blockIdx.y;
+
+    int world_cell = tx + ty*dim_world;
+
+    if(world_cell >= dim_world*dim_world) {
+        return;
+    }
+    else{
+        float val = world[world_cell];
+        int id = id_matrix[world_cell];
+        atomicAdd(&creature_occupations[id+WORLD_OBJECT],1);
+        atomicAdd(&creature_values[id+WORLD_OBJECT],val);
+        //printf("%d: occupation: %d totale %f \n",id,creature_occupations[id+WORLD_OBJECT],creature_values[id+WORLD_OBJECT]);
+    }
+
+}
+
+extern "C" void wrap_creature_evaluation(float *world, int *id_matrix, 
+                                        int *creature_occupations, float *creature_values, 
+                                        int dim_world, int number_of_creatures, cudaStream_t stream
+                                ){
+
+    cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties,0);
+
+    int n_thread = 32;
+    int n_block = dim_world / n_thread;
+    if(n_block==0) n_block++;
+    dim3 block = dim3(n_block,n_block);
+    dim3 thread = dim3(n_thread,n_thread);
+
+    //launch kernel 
+    creature_evaluation<<<block,thread,0,stream>>>(world,id_matrix,creature_occupations,creature_values,number_of_creatures,dim_world);
+    //cudaStreamSynchronize(stream);
+    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("wrap creature evaluation: %s\n",cudaGetErrorString(cudaGetLastError()));
+
+}
+
+
+
+
+
+
+
+
+

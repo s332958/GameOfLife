@@ -2,6 +2,9 @@
 #include <vector>
 #include <sstream>
 
+#ifndef UTILS
+#define UTILS
+
 void readWorld(const std::string& filename, int* dim, float** matrix, int** id_matrix);
 void readMatrix(const std::string& filename, int* dim, float** matrix);
 void printing_world(const std::string& description, float* world, int* id_matrix, int dim_world);
@@ -69,3 +72,5 @@ class SimulationSetup{
 };
 
 std::vector<SimulationSetup> readConfiguration(std::string fileName);
+
+#endif
