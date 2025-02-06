@@ -62,7 +62,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
         controllo_errore_cuda("passaggio mondo su CPU", cudaMemcpyAsync(mondo, mondo_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToHost, stream));
         controllo_errore_cuda("passaggio id_matrix su CPU", cudaMemcpyAsync(id_matrix, id_matrix_cu, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyDeviceToHost, stream));
 
-        save_matrix_to_file(file_mondo, mondo, dim_mondo);
+        save_matrix_to_file(file_mondo, mondo, dim_mondo); //questo si può portare fuori
         save_matrix_to_file(file_id_matrix, id_matrix, dim_mondo);
     }
     controllo_errore_cuda("Sincronizzazione Stream dopo aggiunta creature",cudaStreamSynchronize(stream));
@@ -159,7 +159,7 @@ int main() {
 
     // Dichiarazione degli stream CUDA
     cudaStream_t vs[10];  // Numero di stream massimo
-    int numero_convoluzioni = 1;
+    int numero_convoluzioni = 300;
 
     std::cout << "Numero di simulazioni: " << numero_stream << std::endl;
 
