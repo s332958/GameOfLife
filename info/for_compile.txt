@@ -3,3 +3,6 @@ nvcc -arch=sm_50 main.cpp libs/kernel.cu libs/loader.cpp -o main
 
 
 nvcc -arch=sm_86 main.cpp libs/kernel.cu libs/loader.cpp -o main
+
+nvcc -g -G -arch=sm_86 main.cpp libs/kernel.cu libs/loader.cpp -o main
+compute-sanitizer --print-limit 10 ./main

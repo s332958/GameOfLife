@@ -99,7 +99,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
 
         end = clock();
         gpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-        printf("Tempo di esecuzione: %.5f secondi\n", gpu_time_used);
+        printf("%d -- Tempo di esecuzione: %.5f secondi\n",i, gpu_time_used);
     }
     controllo_errore_cuda("Sincronizzazione Stream dopo convoluzioni",cudaStreamSynchronize(stream));
 
@@ -122,12 +122,12 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     controllo_errore_cuda("Spostamento creature value tot da CPU a GPU", cudaMemcpyAsync(creature_value_tot_cu,creature_value_tot,sizeof(float)*n_creature_obstacles,cudaMemcpyHostToDevice,stream));
     controllo_errore_cuda("Spostamento creature occupation da CPU a GPU", cudaMemcpyAsync(creature_occupation_cu,creature_occupation,sizeof(int)*n_creature_obstacles,cudaMemcpyHostToDevice,stream));
 
-    wrap_creature_evaluation(mondo_cu,id_matrix,creature_occupation_cu,creature_value_tot_cu,dim_mondo,numero_creature,stream);
-    controllo_errore_cuda("Sincronizzazione Stream dopo valutazione",cudaStreamSynchronize(stream));
-
+    wrap_creature_evaluation(mondo_cu,id_matrix,creature_occupation_cu,creature_value_tot_cu,dim_mondo,n_creature_obstacles,stream);
+    
     controllo_errore_cuda("Spostamento creature value tot da GPU a CPU", cudaMemcpyAsync(creature_value_tot,creature_value_tot_cu,sizeof(float)*n_creature_obstacles,cudaMemcpyDeviceToHost,stream));
     controllo_errore_cuda("Spostamento creature occupation da GPU a CPU", cudaMemcpyAsync(creature_occupation,creature_occupation_cu,sizeof(int)*n_creature_obstacles,cudaMemcpyDeviceToHost,stream));
-
+    
+    controllo_errore_cuda("Sincronizzazione Stream dopo valutazione",cudaStreamSynchronize(stream));
     for(int i=0; i<n_creature_obstacles;i++){
         std::cout << "Creature " << i-1 << ": " << "cell ocupation: " << creature_occupation[i] << " total value: " << creature_value_tot[i] << "\n";
     }
@@ -159,7 +159,7 @@ int main() {
 
     // Dichiarazione degli stream CUDA
     cudaStream_t vs[10];  // Numero di stream massimo
-    int numero_convoluzioni = 300;
+    int numero_convoluzioni = 1;
 
     std::cout << "Numero di simulazioni: " << numero_stream << std::endl;
 

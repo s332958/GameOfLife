@@ -67,7 +67,7 @@ def aggiorna(frame, matrici1, matrici2, img, ax):
 
     colori_id = colori[matrice_corrente_2] 
 
-    immagine_colori = (colori_id * (matrice_corrente_1[:, :, np.newaxis] / 180)).astype(np.uint8)
+    immagine_colori = (colori_id * (matrice_corrente_1[:, :, np.newaxis] / 255)).astype(np.uint8)
 
     img.set_data(immagine_colori)
     ax.set_title(f"Matrice {frame + 1}")

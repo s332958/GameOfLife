@@ -102,7 +102,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
         //activation function        
         //float m = 0.135, s = 0.015, T = 10;
-        float m = 0.5, s = 0.15, T = 10;
+        float m = 0.5, s = 0.15, T = 15;
         float growth_value = exp(-pow(((value - m) / s),2)/ 2 )*2-1;
         float increment = (1.0 / T) * growth_value;
         float final_point = fmaxf(0.0, fminf(1.0, world[cell_index]/255 + increment)); 
@@ -131,6 +131,7 @@ __global__ void add_creature_to_world(float* creature, float *world, int *id_mat
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
 
+    __shared__ 
     //stop thread out of bound
     if (y>=dim_creature || x>=dim_creature) return;
 
@@ -218,30 +219,48 @@ extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, fl
 __global__ void creature_evaluation(
     float *world, int *id_matrix,
     int *creature_occupations, float *creature_values,
-    int number_of_creatures, int dim_world
-){
-    
+    int n_creature_obstacles, int dim_world)
+    {  
     int tx = threadIdx.x + blockDim.x * blockIdx.x;
     int ty = threadIdx.y + blockDim.y * blockIdx.y;
-
+    
     int world_cell = tx + ty*dim_world;
 
-    if(world_cell >= dim_world*dim_world) {
-        return;
+    __shared__ float score_blocks[MAX_CREATURES];
+    __shared__ float volume_blocks[MAX_CREATURES];
+
+    if (threadIdx.y == 0 && threadIdx.x < n_creature_obstacles){        
+        score_blocks[threadIdx.x] = 0.0f; 
+        volume_blocks[threadIdx.x] = 0.0f;
     }
-    else{
+
+    __syncthreads();
+
+    if (world_cell < dim_world * dim_world) {
         float val = world[world_cell];
         int id = id_matrix[world_cell];
-        atomicAdd(&creature_occupations[id+WORLD_OBJECT],1);
-        atomicAdd(&creature_values[id+WORLD_OBJECT],val);
-        //printf("%d: occupation: %d totale %f \n",id,creature_occupations[id+WORLD_OBJECT],creature_values[id+WORLD_OBJECT]);
+        if (id >= 0 && id < n_creature_obstacles) { 
+            atomicAdd(&score_blocks[id], val);
+            atomicAdd(&volume_blocks[id], 1);
+        }
+    }
+
+    __syncthreads();
+
+    
+    if(threadIdx.x == 0 && threadIdx.y == 0){
+        for(int i = 0; i < n_creature_obstacles; i++){
+            atomicAdd(&creature_occupations[i],volume_blocks[i]);
+            atomicAdd(&creature_values[i],score_blocks[i]);
+    
+        }
     }
 
 }
 
 extern "C" void wrap_creature_evaluation(float *world, int *id_matrix, 
                                         int *creature_occupations, float *creature_values, 
-                                        int dim_world, int number_of_creatures, cudaStream_t stream
+                                        int dim_world, int n_creature_obstacles, cudaStream_t stream
                                 ){
 
     cudaDeviceProp properties;
@@ -249,13 +268,13 @@ extern "C" void wrap_creature_evaluation(float *world, int *id_matrix,
 
     int n_thread = 32;
     int n_block = dim_world / n_thread;
-    if(n_block==0) n_block++;
+    //if(n_block==0) n_block++;
     dim3 block = dim3(n_block,n_block);
     dim3 thread = dim3(n_thread,n_thread);
 
     //launch kernel 
-    //creature_evaluation<<<block,thread,0,stream>>>(world,id_matrix,creature_occupations,creature_values,number_of_creatures,dim_world);
-    //cudaStreamSynchronize(stream);
+    creature_evaluation<<<block,thread,0,stream>>>(world,id_matrix,creature_occupations,creature_values,n_creature_obstacles,dim_world);
+    cudaStreamSynchronize(stream);
     if(cudaGetLastError()!=cudaError::cudaSuccess) printf("wrap creature evaluation: %s\n",cudaGetErrorString(cudaGetLastError()));
 
 }
