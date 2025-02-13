@@ -98,6 +98,33 @@ void create_matrix(const std::string& filename, int dim, int value) {
     }
 }
 
+
+// Funzione per salvare un array di matrici su un file già aperto
+void save_matrices_to_file(std::ofstream& file, unsigned char* matrix, int num_matrix, int dim_matrix, bool debug) {
+    if (!file.is_open()) {
+        std::cerr << "Errore: il file non è aperto!" << std::endl;
+        return;
+    }
+    
+    // Calcola il numero di matrici
+    
+    for (int m = 0; m < num_matrix; m++) {
+        for (int i = 0; i < dim_matrix; i++) {
+            for (int j = 0; j < dim_matrix; j++) {
+                file << (int)matrix[m * dim_matrix * dim_matrix + i * dim_matrix + j] << " ";
+            }
+            file << "\n";
+        }
+        file << "\n"; // Separazione tra matricistatic_cast<int>()
+    }
+    
+    std::cout << num_matrix << " matrici salvate correttamente nel file.\n";
+}
+
+
+
+/*
+
 // Funzione per salvare una matrice su file
 void save_matrix_to_file(const std::string& filename, float* matrix, int dim, bool debug) {
     std::ofstream file(filename, std::ios::app);
@@ -162,6 +189,7 @@ void save_matrix_to_file(std::ofstream& file, int* matrix, int dim, bool debug )
     file << "\n";
     if(debug) std::cout << "Matrice salvata correttamente nel file.\n";
 }
+*/
 
 //funzione per la lettura delle configurazioni del programma
 std::vector<SimulationSetup> readConfiguration(std::string fileName){

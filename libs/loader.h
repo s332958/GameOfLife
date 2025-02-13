@@ -11,10 +11,12 @@ void printing_world(const std::string& description, float* world, int* id_matrix
 void printing_matrix(const std::string& description, float* matrix, int dim);
 void clear_file(const std::string& filename, bool debug=false);
 void create_matrix(const std::string& filename, int dim, int value);
-void save_matrix_to_file(const std::string& filename, int* matrix, int dim, bool debug=false);
-void save_matrix_to_file(const std::string& filename, float* matrix, int dim, bool debug=false);
-void save_matrix_to_file(std::ofstream& file, float* matrix, int dim, bool debug=false);
-void save_matrix_to_file(std::ofstream& file, int* matrix, int dim, bool debug=false);
+
+void save_matrices_to_file(std::ofstream& file, unsigned char* matrix, int num_matrix, int dim_matrix, bool debug = false);
+
+
+
+
 
 class Posizione {
 public:
