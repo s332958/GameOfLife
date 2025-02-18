@@ -131,7 +131,6 @@ __global__ void add_creature_to_world(float* creature, float *world, int *id_mat
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
 
-    __shared__ 
     //stop thread out of bound
     if (y>=dim_creature || x>=dim_creature) return;
 
@@ -163,10 +162,12 @@ extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *i
     int n_thread_per_block = properties.maxThreadsPerBlock;  
     int thread_per_dimension = sqrt(n_thread_per_block);
     int n_block = dim_world / thread_per_dimension;
-    if(n_block%thread_per_dimension!=0) n_block=n_block+1; 
+    if(n_block%thread_per_dimension!=0 || n_block==0) n_block=n_block+1; 
 
     dim3 thread_number = dim3(thread_per_dimension, thread_per_dimension);  
     dim3 block_number = dim3(n_block, n_block); 
+
+    //std::cout << "thread e blocchi per add creature" << thread_per_dimension << "   " << n_block << "\n";
     
     //launch kernel
     add_creature_to_world<<<block_number,thread_number,0,stream>>>(creature,world,id_matrix,dim_creature,dim_world,pos_x,pos_y,creature_id);
@@ -221,6 +222,7 @@ __global__ void creature_evaluation(
     int *creature_occupations, float *creature_values,
     int n_creature_obstacles, int dim_world)
     {  
+
     int tx = threadIdx.x + blockDim.x * blockIdx.x;
     int ty = threadIdx.y + blockDim.y * blockIdx.y;
     
@@ -228,7 +230,8 @@ __global__ void creature_evaluation(
 
     __shared__ float score_blocks[MAX_CREATURES];
     __shared__ float volume_blocks[MAX_CREATURES];
-
+    
+    //azzero i punteggi nella shared memory
     if (threadIdx.y == 0 && threadIdx.x < n_creature_obstacles){        
         score_blocks[threadIdx.x] = 0.0f; 
         volume_blocks[threadIdx.x] = 0.0f;
@@ -236,7 +239,8 @@ __global__ void creature_evaluation(
 
     __syncthreads();
 
-    if (world_cell < dim_world * dim_world) {
+    //controllo di non eccedere fuori dai limiti e se sono ostacoli o celle vuote non le considero
+    if (tx < dim_world && ty < dim_world) {
         float val = world[world_cell];
         int id = id_matrix[world_cell];
         if (id >= 0 && id < n_creature_obstacles) { 
@@ -247,7 +251,7 @@ __global__ void creature_evaluation(
 
     __syncthreads();
 
-    
+    //sommo i valori nelle memorie condivise e li metto nella globale
     if(threadIdx.x == 0 && threadIdx.y == 0){
         for(int i = 0; i < n_creature_obstacles; i++){
             atomicAdd(&creature_occupations[i],volume_blocks[i]);
@@ -274,6 +278,7 @@ extern "C" void wrap_creature_evaluation(float *world, int *id_matrix,
 
     //launch kernel 
     creature_evaluation<<<block,thread,0,stream>>>(world,id_matrix,creature_occupations,creature_values,n_creature_obstacles,dim_world);
+    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori post creature_evalution: %s\n",cudaGetErrorString(cudaGetLastError()));
     cudaStreamSynchronize(stream);
     if(cudaGetLastError()!=cudaError::cudaSuccess) printf("wrap creature evaluation: %s\n",cudaGetErrorString(cudaGetLastError()));
 
