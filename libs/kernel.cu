@@ -7,8 +7,8 @@
 #define WORLD_OBJECT 1
 
 //function for convolution
-__global__ void convolution(float *world, int *id_matrix, float* filter, float *world_out, int *id_matrix_out, 
-                            int dim_world, int dim_filter, int number_of_creatures)
+__global__ void convolution(float *world, int *id_matrix, float* filter, unsigned char *world_save, unsigned char *id_matrix_save, 
+                            int dim_world, int dim_filter, int number_of_creatures, int convolution_iter)
     {
     int radius_filter = (dim_filter-1)/2;
     int centro_x = blockIdx.x;
@@ -48,9 +48,8 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
 
     float value_contribution = filter[filter_cell] * world[world_cell]/255;
     int world_id_cell_contribution = id_matrix[world_cell]; 
-    float ooo = filter[filter_cell];
 
-    atomicAdd(&value_filter_normalizzation,ooo);  
+    atomicAdd(&value_filter_normalizzation,filter[filter_cell]);  
     atomicAdd(&points[world_id_cell_contribution],value_contribution); 
 
 
@@ -115,9 +114,13 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, float *
             final_point = 0;
         }
         */
+        int index_save = convolution_iter*dim_world*dim_world + cell_index;
+        world_save[index_save] = (unsigned char)final_point;
+        id_matrix_save[index_save] = (unsigned char)final_id_cell;
 
-        world_out[cell_index] = (int)final_point;                   
-        id_matrix_out[cell_index] = final_id_cell;               
+        world[cell_index] = (int)final_point;                   
+        id_matrix[cell_index] = final_id_cell;  
+
 
     }
     
@@ -178,8 +181,8 @@ extern "C" void wrap_add_creature_to_world(float* creature, float *world, int *i
 }
 
 //function for prepare and launch convolution
-extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, float *world_out, int *id_matrix_out, 
-                                    int dim_world, int dim_filter, int number_of_creatures, cudaStream_t stream
+extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, unsigned char *world_save, unsigned char *id_matrix_save, 
+                                    int dim_world, int dim_filter, int number_of_creatures, int convolution_iter, cudaStream_t stream
                                 ){
 
     cudaDeviceProp properties;
@@ -189,7 +192,7 @@ extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, fl
     dim3 block_number = dim3(dim_world,dim_world);
 
     //launch kernel 
-    convolution<<<block_number,thread_number,0,stream>>>(world,id_matrix,filter,world_out,id_matrix_out,dim_world,dim_filter,number_of_creatures);
+    convolution<<<block_number,thread_number,0,stream>>>(world,id_matrix,filter,world_save,id_matrix_save,dim_world,dim_filter,number_of_creatures,convolution_iter);
     //cudaStreamSynchronize(stream);
     if(cudaGetLastError()!=cudaError::cudaSuccess) printf("wrap convolution: %s\n",cudaGetErrorString(cudaGetLastError()));
 
