@@ -80,8 +80,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     n = args.n  # Ottiene il valore di n dalla riga di comando
 
-    file_path1 = f"data/output/mondo{n}.txt"
-    file_path2 = f"data/output/id_matrix{n}.txt"
+    file_path1 = f"./data/output/mondo{n}.txt"
+    file_path2 = f"./data/output/id_matrix{n}.txt"
 
     # Leggi le matrici
     matrici1 = leggi_matrici(file_path1)
