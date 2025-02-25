@@ -42,17 +42,23 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, unsigne
     int world_y = ((centro_y + filtro_y + dim_world) % dim_world);
     int world_cell = world_y * dim_world + world_x;
     int id_filter = 0;
-    __syncthreads();
-    id_filter = ID*(!libero) + id_matrix[world_cell]*(libero) - 1;
-    int filter_cell = id_filter*dim_filter*dim_filter + filter_index;
 
-    float value_contribution = filter[filter_cell] * world[world_cell]/255;
+    __syncthreads();
+
+    id_filter = ID*(!libero) + id_matrix[world_cell]*(libero) - 1;
     int world_id_cell_contribution = id_matrix[world_cell]; 
 
-    atomicAdd(&value_filter_normalizzation,filter[filter_cell]);  
-    atomicAdd(&points[world_id_cell_contribution],value_contribution); 
+    if(id_filter>=0 && world_id_cell_contribution>=0){
 
+        int filter_cell = id_filter*dim_filter*dim_filter + filter_index;
+    
+        float value_contribution = filter[filter_cell] * world[world_cell]/255;
+    
+        atomicAdd(&value_filter_normalizzation,filter[filter_cell]);  
+        atomicAdd(&points[world_id_cell_contribution],value_contribution); 
 
+    }
+    
     __syncthreads();
 
 
@@ -94,10 +100,7 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, unsigne
         value = value - enemy;
         //value = libero * best_point + !libero * (points[ ID ] - enemy);
         value = value/value_filter_normalizzation;        
-        //final_id_cell = libero * best_creature + !libero * final_id_cell;
-
-
-        
+        //final_id_cell = libero * best_creature + !libero * final_id_cell;        
 
         //activation function        
         //float m = 0.135, s = 0.015, T = 10;
@@ -191,6 +194,9 @@ extern "C" void wrap_convolution(float *world, int *id_matrix, float* filter, un
     dim3 thread_number = dim3(dim_filter,dim_filter);
     dim3 block_number = dim3(dim_world,dim_world);
 
+    //printf("world: %p \nid_matrix: %p \nfilter: %p \nworld_save: %p \nid_matrix_save: %p \n",world,id_matrix,filter,world_save,id_matrix_save);
+    //printf("blocchi: (%d,%d), thread: (%d,%d) \n",block_number.x,block_number.y,thread_number.x,thread_number.y);
+
     //launch kernel 
     convolution<<<block_number,thread_number,0,stream>>>(world,id_matrix,filter,world_save,id_matrix_save,dim_world,dim_filter,number_of_creatures,convolution_iter);
     //cudaStreamSynchronize(stream);
@@ -275,9 +281,11 @@ extern "C" void wrap_creature_evaluation(float *world, int *id_matrix,
 
     int n_thread = 32;
     int n_block = dim_world / n_thread;
-    //if(n_block==0) n_block++;
+    if(n_block==0) n_block++;
     dim3 block = dim3(n_block,n_block);
     dim3 thread = dim3(n_thread,n_thread);
+
+    //printf("blocchi: (%d,%d), thread: (%d,%d) \n",block.x,block.y,thread.x,thread.y);
 
     //launch kernel 
     creature_evaluation<<<block,thread,0,stream>>>(world,id_matrix,creature_occupations,creature_values,n_creature_obstacles,dim_world);

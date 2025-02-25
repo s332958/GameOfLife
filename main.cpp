@@ -10,7 +10,7 @@
 #include <vector>
 #include <format>
 
-#define MAX_SAVED_WORLDS 100
+#define MAX_SAVED_WORLDS 5
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
 
 void controllo_errore_cuda(const std::string& descrizione, cudaError_t errore){
@@ -20,9 +20,12 @@ void controllo_errore_cuda(const std::string& descrizione, cudaError_t errore){
 
 void simulazione(std::string& world_name, std::vector<std::string>& filters_name, std::vector<std::string>& creature_names, 
                  int id_simulation, std::vector<Posizione> posizioni, int number_of_creatures, int numbers_of_convolution, 
-                 cudaStream_t stream, std::ofstream& file_mondo, std::ofstream& file_id_matrix){
+                 cudaStream_t stream, std::ofstream& file_mondo, std::ofstream& file_id_matrix,
+                 cudaDeviceProp const &device_properties){
 
     cudaError_t err = cudaSuccess;
+    const int mem_max = device_properties.totalGlobalMem;
+    const int compute_capability = device_properties.major;
 
     // Dimensioni e matrici per creature, filtro, mondo e id_matrix
     int *dim_creature, dim_mondo, dim_filtro, *id_matrix;
@@ -55,11 +58,15 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     int *id_matrix_cu;
     unsigned char *mondo_cu_save, *id_matrix_cu_save;
 
-    controllo_errore_cuda("allocazione mondo", cudaMallocAsync((void**)&mondo_cu, dim_mondo*dim_mondo*sizeof(float),stream));
-    controllo_errore_cuda("allocazione id_matrix", cudaMallocAsync((void**)&id_matrix_cu, dim_mondo*dim_mondo*sizeof(int),stream));
+    if(compute_capability>=7) controllo_errore_cuda("allocazione mondo", cudaMallocAsync((void**)&mondo_cu, dim_mondo*dim_mondo*sizeof(float),stream));
+    else controllo_errore_cuda("allocazione mondo", cudaMalloc((void**)&mondo_cu, dim_mondo*dim_mondo*sizeof(float)));
+    if(compute_capability>=7) controllo_errore_cuda("allocazione id_matrix", cudaMallocAsync((void**)&id_matrix_cu, dim_mondo*dim_mondo*sizeof(int),stream));
+    else controllo_errore_cuda("allocazione id_matrix", cudaMalloc((void**)&id_matrix_cu, dim_mondo*dim_mondo*sizeof(int)));
 
-    controllo_errore_cuda("allocazione mondo", cudaMallocAsync((void**)&mondo_cu_save, dim_mondo*dim_mondo*sizeof(unsigned char)*MAX_SAVED_WORLDS,stream));
-    controllo_errore_cuda("allocazione id_matrix", cudaMallocAsync((void**)&id_matrix_cu_save, dim_mondo*dim_mondo*sizeof(unsigned char)*MAX_SAVED_WORLDS,stream));
+    if(compute_capability>=7) controllo_errore_cuda("allocazione mondo", cudaMallocAsync((void**)&mondo_cu_save, dim_mondo*dim_mondo*sizeof(unsigned char)*MAX_SAVED_WORLDS,stream));
+    else controllo_errore_cuda("allocazione mondo", cudaMalloc((void**)&mondo_cu_save, dim_mondo*dim_mondo*sizeof(unsigned char)*MAX_SAVED_WORLDS));
+    if(compute_capability>=7) controllo_errore_cuda("allocazione id_matrix", cudaMallocAsync((void**)&id_matrix_cu_save, dim_mondo*dim_mondo*sizeof(unsigned char)*MAX_SAVED_WORLDS,stream));
+    else controllo_errore_cuda("allocazione id_matrix", cudaMalloc((void**)&id_matrix_cu_save, dim_mondo*dim_mondo*sizeof(unsigned char)*MAX_SAVED_WORLDS));
 
     controllo_errore_cuda("passaggio mondo su GPU", cudaMemcpyAsync(mondo_cu, mondo, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyHostToDevice, stream));
     controllo_errore_cuda("passaggio id_matrix su GPU", cudaMemcpyAsync(id_matrix_cu, id_matrix, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyHostToDevice, stream));
@@ -167,13 +174,17 @@ int main() {
 
     const int MAX_CREATURE = 64;
 
+    // Leggo le statistiche della mia GPU
+    cudaDeviceProp properties;
+    cudaGetDeviceProperties_v2(&properties,0);
+
     // Leggi la configurazione
     std::vector<SimulationSetup> simulationSetup = readConfiguration("data/configurations/configuration.txt");
     int numero_stream = simulationSetup.size();  // Numero stream in base al numero di configurazioni
 
     // Dichiarazione degli stream CUDA
     cudaStream_t vs[10];  // Numero di stream massimo
-    int numero_convoluzioni = 10;
+    int numero_convoluzioni = 1;
 
     std::cout << "Numero di simulazioni: " << numero_stream << std::endl;
 
@@ -202,7 +213,8 @@ int main() {
             numero_convoluzioni,
             vs[i],
             file_mondo,
-            file_id_matrix
+            file_id_matrix,
+            properties
         );
 
         // Chiusura dei file
