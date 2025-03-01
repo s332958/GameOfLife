@@ -10,7 +10,7 @@
 #include <vector>
 #include <format>
 
-#define MAX_SAVED_WORLDS 5
+#define MAX_SAVED_WORLDS 100
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
 
 void controllo_errore_cuda(const std::string& descrizione, cudaError_t errore){
@@ -107,8 +107,8 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
             gpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
             printf("%d -- Tempo di esecuzione: %.5f secondi\n",i, gpu_time_used);
         }               
-        controllo_errore_cuda("Sincronizzazione Stream dopo convoluzioni",cudaStreamSynchronize(stream));
         start = clock();
+        controllo_errore_cuda("Sincronizzazione Stream dopo convoluzioni",cudaStreamSynchronize(stream));
         controllo_errore_cuda("passaggio mondo su CPU", cudaMemcpyAsync(mondo, mondo_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToHost, stream));
         controllo_errore_cuda("passaggio id_matrix su CPU", cudaMemcpyAsync(id_matrix, id_matrix_cu, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyDeviceToHost, stream));
     

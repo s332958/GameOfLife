@@ -11,7 +11,7 @@ def normalize_image(image_array):
         return image_array  # Evita divisione per zero
     return image_array / total
 
-def process_images(input_folder="data/custom_kernels", output_folder="filters/custom_filters"):
+def process_images(input_folder="./data/custom_kernels", output_folder="./filters/custom_filters"):
     """
     Legge immagini grayscale .png 8 bit da una cartella e salva matrici normalizzate in file .txt.
 
