@@ -1,5 +1,6 @@
 #include "libs/loader.h"
 #include "libs/kernel.cuh"
+#include <GLFW/glfw3.h>
 
 #include <cuda_runtime.h>
 #include <stdio.h>
@@ -10,8 +11,51 @@
 #include <vector>
 #include <format>
 
-#define MAX_SAVED_WORLDS 100
+#define MAX_SAVED_WORLDS 1000
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
+const int WIDTH = 1024;
+const int HEIGHT = 1024;
+GLFWwindow* window;
+GLuint textureID;
+
+
+float colori[21][3]; // 21 perché includiamo l'indice 0
+
+
+void mappaColori(float* mondo, int* id_matrix, float* mondo_rgb, int width, int height) {
+    // Inizializza i colori casuali per i valori da 1 a 20
+    srand(static_cast<unsigned int>(time(0))); // Inizializza il seed per rand()
+
+    // Mappa i valori di id_matrix ai colori
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int index = y * width + x;
+            int id = id_matrix[index];
+
+            if (id == -1) {
+                // Bianco
+                mondo_rgb[index * 3 + 0] = 255.0f; // R
+                mondo_rgb[index * 3 + 1] = 255.0f; // G
+                mondo_rgb[index * 3 + 2] = 255.0f; // B
+            } else if (id == 0) {
+                // Nero
+                mondo_rgb[index * 3 + 0] = 0.0f; // R
+                mondo_rgb[index * 3 + 1] = 0.0f; // G
+                mondo_rgb[index * 3 + 2] = 0.0f; // B
+            } else if (id >= 1 && id <= 20) {
+                // Colori casuali predefiniti
+                mondo_rgb[index * 3 + 0] = colori[id][0]*mondo[index]/65025.0f; // R
+                mondo_rgb[index * 3 + 1] = colori[id][1]*mondo[index]/65025.0f; // G
+                mondo_rgb[index * 3 + 2] = colori[id][2]*mondo[index]/65025.0f; // B
+            } else {
+                // Valore non valido (ad esempio, nero)
+                mondo_rgb[index * 3 + 0] = 0.0f; // R
+                mondo_rgb[index * 3 + 1] = 0.0f; // G
+                mondo_rgb[index * 3 + 2] = 0.0f; // B
+            }
+        }
+    }
+}
 
 void controllo_errore_cuda(const std::string& descrizione, cudaError_t errore){
     if(errore==cudaError::cudaSuccess) return;
@@ -29,7 +73,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
 
     // Dimensioni e matrici per creature, filtro, mondo e id_matrix
     int *dim_creature, dim_mondo, dim_filtro, *id_matrix;
-    float **filtri, **creature, *mondo;
+    float **filtri, **creature, *mondo, *mondo_rgb;
     unsigned char *mondo_save, *id_matrix_save;
 
 
@@ -39,7 +83,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
 
     
     std::string nome_mondo = world_name;
-    readWorld(nome_mondo.c_str(), &dim_mondo, &mondo, &id_matrix);
+    readWorld(nome_mondo.c_str(), &dim_mondo, &mondo, &id_matrix, &mondo_rgb);
     
     mondo_save = (unsigned char*) malloc(dim_mondo*dim_mondo*MAX_SAVED_WORLDS*sizeof(unsigned char));
     id_matrix_save = (unsigned char*) malloc(dim_mondo*dim_mondo*MAX_SAVED_WORLDS*sizeof(unsigned char));
@@ -55,6 +99,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     int numero_creature = 0;
     float *filtro_cu, *creature_cu;
     float *mondo_cu;
+    float *creature_energy_cu;
     int *id_matrix_cu;
     unsigned char *mondo_cu_save, *id_matrix_cu_save;
 
@@ -89,39 +134,69 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     /*
     float *mondo_out_cu;
     int *id_matrix_out_cu;
-
+    
     controllo_errore_cuda("allocazione memoria mondo_out su GPU", cudaMallocAsync((void**)&mondo_out_cu, dim_mondo*dim_mondo*sizeof(float),stream));
     controllo_errore_cuda("allocazione memoria matrice_index_out su GPU", cudaMallocAsync((void**)&id_matrix_out_cu, dim_mondo*dim_mondo*sizeof(int),stream));
     */
-    for( int j= 0; j < numbers_of_convolution; j++){
-        double gpu_time_used;
-        clock_t start, end;
-        for(int i = 0; i < MAX_SAVED_WORLDS; i++){
+   for( int j= 0; j < numbers_of_convolution; j++){
+       double gpu_time_used;
+       clock_t start, end;
+       for(int i = 0; i < MAX_SAVED_WORLDS; i++){
             start = clock();
-            
-            //filtro cu dovrebbe contenere tutti i filtri salvati in modo contiguo
+            if (glfwWindowShouldClose(window)) {
+                std::cout << "Finestra chiusa. Terminazione del programma." << std::endl;
+                break; // Esce dal ciclo
+            }
+
             wrap_convolution(mondo_cu, id_matrix_cu, filtro_cu, mondo_cu_save, id_matrix_cu_save, dim_mondo, dim_filtro, numero_creature, i, stream);
-            
-    
+
+            controllo_errore_cuda("Sincronizzazione Stream dopo convoluzioni",cudaStreamSynchronize(stream));
+            controllo_errore_cuda("passaggio mondo su CPU", cudaMemcpyAsync(mondo, mondo_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToHost, stream));
+            controllo_errore_cuda("passaggio id_matrix su CPU", cudaMemcpyAsync(id_matrix, id_matrix_cu, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyDeviceToHost, stream));
+
+            mappaColori(mondo, id_matrix, mondo_rgb, dim_mondo, dim_mondo);
+
+            // Carica i dati nella texture OpenGL
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, dim_mondo, dim_mondo, 0, GL_RGB, GL_FLOAT, mondo_rgb);
+
+            // Pulizia del buffer di colore
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            // Renderizzazione della texture su un quad
+            glBegin(GL_QUADS);
+            glTexCoord2f(0.0f, 0.0f); glVertex2f(-1.0f, -1.0f);
+            glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0f, -1.0f);
+            glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0f, 1.0f);
+            glTexCoord2f(0.0f, 1.0f); glVertex2f(-1.0f, 1.0f);
+            glEnd();
+
+            // Swap dei buffer
+            glfwSwapBuffers(window);
+
+            // Gestione degli eventi
+            glfwPollEvents();
+
+
+
             end = clock();
             gpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
             printf("%d -- Tempo di esecuzione: %.5f secondi\n",i, gpu_time_used);
         }               
         start = clock();
-        controllo_errore_cuda("Sincronizzazione Stream dopo convoluzioni",cudaStreamSynchronize(stream));
-        controllo_errore_cuda("passaggio mondo su CPU", cudaMemcpyAsync(mondo, mondo_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToHost, stream));
-        controllo_errore_cuda("passaggio id_matrix su CPU", cudaMemcpyAsync(id_matrix, id_matrix_cu, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyDeviceToHost, stream));
     
-        controllo_errore_cuda("passaggio mondo_save su CPU", cudaMemcpyAsync(mondo_save, mondo_cu_save, dim_mondo*dim_mondo*MAX_SAVED_WORLDS*sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
-        controllo_errore_cuda("passaggio id_matrix_save su CPU", cudaMemcpyAsync(id_matrix_save, id_matrix_cu_save, dim_mondo*dim_mondo*MAX_SAVED_WORLDS*sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
+        //controllo_errore_cuda("passaggio mondo_save su CPU", cudaMemcpyAsync(mondo_save, mondo_cu_save, dim_mondo*dim_mondo*MAX_SAVED_WORLDS*sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
+        //controllo_errore_cuda("passaggio id_matrix_save su CPU", cudaMemcpyAsync(id_matrix_save, id_matrix_cu_save, dim_mondo*dim_mondo*MAX_SAVED_WORLDS*sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
         
-        save_matrices_to_file(file_mondo, mondo_save, MAX_SAVED_WORLDS, dim_mondo, true);
-        save_matrices_to_file(file_id_matrix, id_matrix_save, MAX_SAVED_WORLDS, dim_mondo, true);
+        //save_matrices_to_file(file_mondo, mondo_save, MAX_SAVED_WORLDS, dim_mondo, true);
+        //save_matrices_to_file(file_id_matrix, id_matrix_save, MAX_SAVED_WORLDS, dim_mondo, true);
         end = clock();
         gpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
         printf("%d -- Tempo di save: %.5f secondi\n",j, gpu_time_used);
     }
 
+    glDeleteTextures(1, &textureID);
+    glfwDestroyWindow(window);
+    glfwTerminate();
 
     float *creature_value_tot, *creature_value_tot_cu;
     int *creature_occupation, *creature_occupation_cu;
@@ -173,6 +248,32 @@ int main() {
     clock_t start = clock();  // Start time
 
     const int MAX_CREATURE = 64;
+    for (int i = 1; i <= 20; i++) {
+        colori[i][0] = static_cast<float>(rand() % 256); // R
+        colori[i][1] = static_cast<float>(rand() % 256); // G
+        colori[i][2] = static_cast<float>(rand() % 256); // B
+    }
+    
+
+    if (!glfwInit()) {
+        std::cerr << "Errore nell'inizializzazione di GLFW" << std::endl;
+        return -1;
+    }
+    window = glfwCreateWindow(WIDTH, HEIGHT, "OpenGL Image Rendering", NULL, NULL);
+
+    if (!window) {
+        std::cerr << "Errore nella creazione della finestra" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    glfwMakeContextCurrent(window);
+    // Inizializzazione di OpenGL
+    glEnable(GL_TEXTURE_2D);
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // Leggo le statistiche della mia GPU
     cudaDeviceProp properties;
@@ -184,7 +285,7 @@ int main() {
 
     // Dichiarazione degli stream CUDA
     cudaStream_t vs[10];  // Numero di stream massimo
-    int numero_convoluzioni = 10;
+    int numero_convoluzioni = 1000;
 
     std::cout << "Numero di simulazioni: " << numero_stream << std::endl;
 

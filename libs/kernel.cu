@@ -49,16 +49,13 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, unsigne
     int world_id_cell_contribution = id_matrix[world_cell]; 
 
     if(id_filter>=0 && world_id_cell_contribution>=0){
-
         int filter_cell = id_filter*dim_filter*dim_filter + filter_index;
     
         float value_contribution = filter[filter_cell] * world[world_cell]/255;
     
         atomicAdd(&value_filter_normalizzation,filter[filter_cell]);  
         atomicAdd(&points[world_id_cell_contribution],value_contribution); 
-
     }
-    
     __syncthreads();
 
 
@@ -117,9 +114,9 @@ __global__ void convolution(float *world, int *id_matrix, float* filter, unsigne
             final_point = 0;
         }
         */
-        int index_save = convolution_iter*dim_world*dim_world + cell_index;
-        world_save[index_save] = (unsigned char)final_point;
-        id_matrix_save[index_save] = (unsigned char)final_id_cell;
+        //int index_save = convolution_iter*dim_world*dim_world + cell_index;
+        //world_save[index_save] = (unsigned char)final_point;
+        //id_matrix_save[index_save] = (unsigned char)final_id_cell;
 
         world[cell_index] = (int)final_point;                   
         id_matrix[cell_index] = final_id_cell;  

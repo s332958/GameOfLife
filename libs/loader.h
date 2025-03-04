@@ -5,7 +5,7 @@
 #ifndef UTILS
 #define UTILS
 
-void readWorld(const std::string& filename, int* dim, float** matrix, int** id_matrix);
+void readWorld(const std::string& filename, int* dim, float** matrix, int** id_matrix, float** world_rgb);
 void readMatrix(const std::string& filename, int* dim, float** matrix);
 void printing_world(const std::string& description, float* world, int* id_matrix, int dim_world);
 void printing_matrix(const std::string& description, float* matrix, int dim);

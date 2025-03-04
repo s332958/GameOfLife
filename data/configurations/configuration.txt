@@ -1,6 +1,3 @@
-data/worlds/world_small2.txt
-1
-data/creatures/creature_small.txt 0 0 data/filters/filter_small.txt
 
 data/worlds/mondo_ostacoli.txt
 8

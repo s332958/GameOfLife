@@ -6,7 +6,7 @@
 #include "loader.h"
 
 // Funzione per leggere una matrice da file e calcolare id_matrix
-void readWorld(const std::string& filename, int* dim_world, float** world, int** id_matrix) {
+void readWorld(const std::string& filename, int* dim_world, float** world, int** id_matrix, float** world_rgb) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Errore nell'apertura del file!" << std::endl;
@@ -16,6 +16,7 @@ void readWorld(const std::string& filename, int* dim_world, float** world, int**
     file >> d;
     *world = (float*)malloc(d * d * sizeof(float));
     *id_matrix = (int*)malloc(d * d * sizeof(int));
+    *world_rgb = (float*)malloc(d * d * 3 * sizeof(float));
     
     for (int i = 0; i < d * d; i++) {
         file >> (*world)[i];
