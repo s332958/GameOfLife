@@ -11,7 +11,7 @@
 #include <vector>
 #include <format>
 
-#define MAX_SAVED_WORLDS 100
+#define MAX_SAVED_WORLDS 1
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
 const int WIDTH = 1024;
 const int HEIGHT = 1024;
@@ -65,7 +65,7 @@ void controllo_errore_cuda(const std::string& descrizione, cudaError_t errore){
 void simulazione(std::string& world_name, std::vector<std::string>& filters_name, std::vector<std::string>& creature_names, 
                  int id_simulation, std::vector<Posizione> posizioni, int number_of_creatures, int numbers_of_convolution, 
                  cudaStream_t stream, std::ofstream& file_mondo, std::ofstream& file_id_matrix,
-                 cudaDeviceProp const &device_properties){
+                 cudaDeviceProp const &device_properties, bool render){
 
     cudaError_t err = cudaSuccess;
     const int mem_max = device_properties.totalGlobalMem;
@@ -131,6 +131,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
         controllo_errore_cuda("passaggio filtro i su GPU", cudaMemcpyAsync(filtro_cu+(dim_filtro*dim_filtro*i), filtri[i], dim_filtro*dim_filtro*sizeof(float), cudaMemcpyHostToDevice, stream));
     }
     controllo_errore_cuda("Sincronizzazione Stream dopo salvataggio filtri su GPU",cudaStreamSynchronize(stream));
+    
     /*
     float *mondo_out_cu;
     int *id_matrix_out_cu;
@@ -150,9 +151,12 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
        clock_t start, end;
        for(int i = 0; i < MAX_SAVED_WORLDS; i++){
             start = clock();
-            if (glfwWindowShouldClose(window)) {
-                std::cout << "Finestra chiusa. Terminazione del programma." << std::endl;
-                break; // Esce dal ciclo
+
+            if(render){
+                if (glfwWindowShouldClose(window)) {
+                    std::cout << "Finestra chiusa. Terminazione del programma." << std::endl;
+                    break; // Esce dal ciclo
+                }
             }
 
             wrap_convolution(mondo_creature,mondo_cu, id_matrix_cu, filtro_cu, mondo_cu_save, id_matrix_cu_save, dim_mondo, dim_filtro, numero_creature, i, stream);
@@ -163,26 +167,27 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
 
             mappaColori(mondo, id_matrix, mondo_rgb, dim_mondo, dim_mondo);
 
-            // Carica i dati nella texture OpenGL
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, dim_mondo, dim_mondo, 0, GL_RGB, GL_FLOAT, mondo_rgb);
+            if(render){
+                // Carica i dati nella texture OpenGL
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, dim_mondo, dim_mondo, 0, GL_RGB, GL_FLOAT, mondo_rgb);
 
-            // Pulizia del buffer di colore
-            glClear(GL_COLOR_BUFFER_BIT);
+                // Pulizia del buffer di colore
+                glClear(GL_COLOR_BUFFER_BIT);
 
-            // Renderizzazione della texture su un quad
-            glBegin(GL_QUADS);
-            glTexCoord2f(0.0f, 0.0f); glVertex2f(-1.0f, -1.0f);
-            glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0f, -1.0f);
-            glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0f, 1.0f);
-            glTexCoord2f(0.0f, 1.0f); glVertex2f(-1.0f, 1.0f);
-            glEnd();
+                // Renderizzazione della texture su un quad
+                glBegin(GL_QUADS);
+                glTexCoord2f(0.0f, 0.0f); glVertex2f(-1.0f, -1.0f);
+                glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0f, -1.0f);
+                glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0f, 1.0f);
+                glTexCoord2f(0.0f, 1.0f); glVertex2f(-1.0f, 1.0f);
+                glEnd();
 
-            // Swap dei buffer
-            glfwSwapBuffers(window);
+                // Swap dei buffer
+                glfwSwapBuffers(window);
 
-            // Gestione degli eventi
-            glfwPollEvents();
-
+                // Gestione degli eventi
+                glfwPollEvents();
+            }
 
 
             end = clock();
@@ -201,9 +206,11 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
         printf("%d -- Tempo di save: %.5f secondi\n",j, gpu_time_used);
     }
 
-    glDeleteTextures(1, &textureID);
-    glfwDestroyWindow(window);
-    glfwTerminate();
+    if(render){
+        glDeleteTextures(1, &textureID);
+        glfwDestroyWindow(window);
+        glfwTerminate();
+    }
 
     float *creature_value_tot, *creature_value_tot_cu;
     int *creature_occupation, *creature_occupation_cu;
@@ -251,8 +258,25 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     free(creature_occupation);
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     clock_t start = clock();  // Start time
+
+    bool render = false;
+    int numero_convoluzioni = 1;
+    
+    // Controlla se c'è almeno un argomento
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-render") {
+            render = true;
+        }
+        if(arg == "-group_convolution"){
+            numero_convoluzioni = std::atoi(argv[i+1]);
+        }
+        if(arg == "-gc"){
+            numero_convoluzioni = std::atoi(argv[i+1]);
+        }
+    }
 
     const int MAX_CREATURE = 64;
     for (int i = 1; i <= 20; i++) {
@@ -261,26 +285,27 @@ int main() {
         colori[i][2] = static_cast<float>(rand() % 256); // B
     }
     
-
-    if (!glfwInit()) {
-        std::cerr << "Errore nell'inizializzazione di GLFW" << std::endl;
-        return -1;
+    if(render){
+        if (!glfwInit()) {
+            std::cerr << "Errore nell'inizializzazione di GLFW" << std::endl;
+            return -1;
+        }
+        window = glfwCreateWindow(WIDTH, HEIGHT, "OpenGL Image Rendering", NULL, NULL);
+    
+        if (!window) {
+            std::cerr << "Errore nella creazione della finestra" << std::endl;
+            glfwTerminate();
+            return -1;
+        }
+    
+        glfwMakeContextCurrent(window);
+        // Inizializzazione di OpenGL
+        glEnable(GL_TEXTURE_2D);
+        glGenTextures(1, &textureID);
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
-    window = glfwCreateWindow(WIDTH, HEIGHT, "OpenGL Image Rendering", NULL, NULL);
-
-    if (!window) {
-        std::cerr << "Errore nella creazione della finestra" << std::endl;
-        glfwTerminate();
-        return -1;
-    }
-
-    glfwMakeContextCurrent(window);
-    // Inizializzazione di OpenGL
-    glEnable(GL_TEXTURE_2D);
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // Leggo le statistiche della mia GPU
     cudaDeviceProp properties;
@@ -292,7 +317,6 @@ int main() {
 
     // Dichiarazione degli stream CUDA
     cudaStream_t vs[10];  // Numero di stream massimo
-    int numero_convoluzioni = 1000;
 
     std::cout << "Numero di simulazioni: " << numero_stream << std::endl;
 
@@ -322,7 +346,8 @@ int main() {
             vs[i],
             file_mondo,
             file_id_matrix,
-            properties
+            properties, 
+            render
         );
 
         // Chiusura dei file

@@ -25,8 +25,8 @@ __global__ void convolution(float *mondo_creature, float *world, int *id_matrix,
     if (ID < 1) return;
     
     
-    int filtro_x = threadIdx.x - radius_filter + centro_x;
-    int filtro_y = threadIdx.y - radius_filter + centro_y;
+    int filtro_x = (threadIdx.x - radius_filter + centro_x) % dim_world;
+    int filtro_y = (threadIdx.y - radius_filter + centro_y) % dim_world;
     int filtro_index = filtro_y * dim_world + filtro_x;
 
     if(centro_index == filtro_index){
