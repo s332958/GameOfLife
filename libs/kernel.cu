@@ -11,7 +11,7 @@
 #define decay -1.0f
 
 //function for convolution
-__global__ void convolution(float *mondo_creature, float *world, int *id_matrix, float* filter, unsigned char *world_save, unsigned char *id_matrix_save, 
+__global__ void convolution(float *mondo_creature, float *world, int *id_matrix, float* filter,
                             int dim_world, int dim_filter, int number_of_creatures, int convolution_iter)
     {
     
@@ -29,8 +29,11 @@ __global__ void convolution(float *mondo_creature, float *world, int *id_matrix,
     int filtro_y = (threadIdx.y - radius_filter + centro_y) % dim_world;
     int filtro_index = filtro_y * dim_world + filtro_x;
 
+    //if( ID<1 ||filtro_x < 0 || filtro_y < 0 || centro_index < 0 || centro_index >= dim_world*dim_world || filtro_x >= dim_world || filtro_y >= dim_world) printf("ERRORE (%d, %d, %d)",filtro_x,filtro_y,centro_index);
+
     if(centro_index == filtro_index){
         atomicAdd(&world[centro_index], decay);
+        //printf("DECADO \n");
         return;
     } 
     
@@ -41,22 +44,23 @@ __global__ void convolution(float *mondo_creature, float *world, int *id_matrix,
     curandState state;
     curand_init(1, index, 0, &state);
     float random_number = curand_uniform(&state);
+    //printf("%f %d,%d \n",random_number,blockIdx.x,blockDim.y);
     float increment = random_number*max_increments/100*world[centro_index];
 
-    atomicAdd(&mondo_creature[ID * dim_world * dim_world + filtro_index], increment);
+    atomicAdd(&mondo_creature[(ID * dim_world * dim_world) + filtro_index], increment);
     atomicAdd(&world[centro_index], -increment);
     
 
 }
 
 __global__ void mondo_cu_update(float *mondo_creature, float *world, int *id_matrix, float* filter, unsigned char *world_save, unsigned char *id_matrix_save, 
-    int dim_world, int dim_block, int number_of_creatures, int convolution_iter)
+                                int dim_world, int number_of_creatures, int convolution_iter)
     {
-    int center_x = blockIdx.x*dim_block + threadIdx.x;
-    int center_y = blockIdx.y*dim_block + threadIdx.y;
+    int center_x = blockIdx.x*blockDim.x + threadIdx.x;
+    int center_y = blockIdx.y*blockDim.y + threadIdx.y;
     int index = center_y * dim_world + center_x;
     
-    if(index > dim_world*dim_world) return;
+    if(index >= dim_world*dim_world) return;
     
     
     int ID = id_matrix[index];
@@ -112,19 +116,23 @@ __global__ void mondo_cu_update(float *mondo_creature, float *world, int *id_mat
     world[index] = final_value;                   
     id_matrix[index] = (int)final_id;  
 
-    }
+}
 
-__global__ void zero_all(float *mondo_creature, int dim_world, int thread_per_dimension, int number_of_creatures){
-    int index = blockIdx.x * thread_per_dimension * thread_per_dimension + threadIdx.y * thread_per_dimension + threadIdx.x;
-    if (index > dim_world * dim_world * (number_of_creatures+1)) return;
+
+__global__ void zero_all(float *mondo_creature, int dim_world, int number_of_creatures){
+    int x = threadIdx.x + blockIdx.x*blockDim.x;
+    int y = threadIdx.y + blockIdx.y*blockDim.y;
+    int z = threadIdx.z + blockIdx.z*blockDim.z;
+    unsigned int index = x + y*dim_world + z*dim_world*dim_world;         //possibile limite?
+    if(index>=dim_world*dim_world*number_of_creatures) return;
     mondo_creature[index] = 0.0f;
 }
 
-__global__ void add_base_food(float*mondo, int *id_matrix, float max_food, int thread_per_dimension, int dim_world){
-    int cx = blockIdx.x * thread_per_dimension + threadIdx.x;
-    int cy = blockIdx.y * thread_per_dimension + threadIdx.y;
+__global__ void add_base_food(float*mondo, int *id_matrix, float max_food, int dim_world){
+    int cx = blockIdx.x * blockDim.x + threadIdx.x;
+    int cy = blockIdx.y * blockDim.y + threadIdx.y;
     int index = cy * dim_world + cx;
-    if (cx > dim_world || cy > dim_world) return;
+    if (cx >= dim_world || cy >= dim_world) return;
     if (id_matrix[index] != 0) return;
     curandState state;
     curand_init(1, index, 0, &state);
@@ -195,17 +203,18 @@ extern "C" void wrap_convolution(float *mondo_creature, float *world, int *id_ma
 
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);    
-    
+    //corretta
     int n_thread_per_block = properties.maxThreadsPerBlock;  
-    int thread_per_dimension = sqrt(n_thread_per_block);
-    int n_block = (dim_world * dim_world * (number_of_creatures+1) + n_thread_per_block - 1) / n_thread_per_block;
-    dim3 thread_number = dim3(thread_per_dimension, thread_per_dimension);  
-    dim3 block_number = dim3(n_block, 1); 
+    int number_of_creature_correct = number_of_creatures +1;
+    int thread_per_xy = sqrt(n_thread_per_block/number_of_creature_correct)+1;
+    int n_block = dim_world / n_thread_per_block +1;
+    dim3 thread_number = dim3(thread_per_xy, thread_per_xy, number_of_creatures);  
+    dim3 block_number = dim3(n_block, n_block, number_of_creatures); 
 
-    zero_all<<<block_number, thread_number>>>(mondo_creature, dim_world, thread_per_dimension, number_of_creatures);
+    zero_all<<<block_number, thread_number,0,stream>>>(mondo_creature, dim_world, number_of_creatures);
     
     
-    
+    //cudaStreamSynchronize(stream);
     
     int dim_filter_5 = 5;
     thread_number = dim3(dim_filter_5,dim_filter_5);
@@ -215,18 +224,22 @@ extern "C" void wrap_convolution(float *mondo_creature, float *world, int *id_ma
     //printf("blocchi: (%d,%d), thread: (%d,%d) \n",block_number.x,block_number.y,thread_number.x,thread_number.y);
 
     //launch kernel 
-    convolution<<<block_number,thread_number,0,stream>>>(mondo_creature, world,id_matrix,filter,world_save,id_matrix_save,dim_world,dim_filter_5,number_of_creatures,convolution_iter);
+    //printf("mondo_creatura %p\n, world %p\n, id_creature %p\n, world_save: %p\n, id_matrix_save: %p\n, filter: %p \n",mondo_creature,world,id_matrix,world_save,id_matrix_save,filter);
+    convolution<<<block_number,thread_number,0,stream>>>(mondo_creature, world,id_matrix,filter,dim_world,dim_filter_5,number_of_creatures,convolution_iter);
+
+    //cudaStreamSynchronize(stream);
 
     if(cudaGetLastError()!=cudaError::cudaSuccess) printf("wrap convolution: %s\n",cudaGetErrorString(cudaGetLastError()));
     //cudaStreamSynchronize(stream);
 
     n_thread_per_block = properties.maxThreadsPerBlock;  
-    thread_per_dimension = sqrt(n_thread_per_block);
+    int thread_per_dimension = sqrt(n_thread_per_block);
     n_block = dim_world / thread_per_dimension;
+    if(n_block==0) n_block = 1;
     thread_number = dim3(thread_per_dimension, thread_per_dimension);  
     block_number = dim3(n_block, n_block); 
 
-    mondo_cu_update<<<block_number,thread_number,0,stream>>>(mondo_creature, world,id_matrix,filter,world_save,id_matrix_save,dim_world,thread_per_dimension,number_of_creatures,convolution_iter);
+    mondo_cu_update<<<block_number,thread_number,0,stream>>>(mondo_creature, world,id_matrix,filter,world_save,id_matrix_save,dim_world,number_of_creatures,convolution_iter);
 
 }
 
@@ -242,28 +255,9 @@ extern "C" void wrap_add_base_food(float *world, int *id_matrix, float max_food,
     dim3 block = dim3(n_block,n_block);
     dim3 thread = dim3(thread_per_dimension,thread_per_dimension);
 
-    add_base_food<<<block,thread>>>(world,id_matrix,max_food,thread_per_dimension,dim_world);
+    add_base_food<<<block,thread>>>(world,id_matrix,max_food,dim_world);
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 __global__ void creature_evaluation(
     float *world, int *id_matrix,
@@ -318,7 +312,7 @@ extern "C" void wrap_creature_evaluation(float *world, int *id_matrix,
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
 
-    int n_thread = dim_world;
+    int n_thread = 32;
     int n_block = dim_world / n_thread;
     if(n_block==0) n_block++;
     dim3 block = dim3(n_block,n_block);

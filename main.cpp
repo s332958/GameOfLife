@@ -11,7 +11,7 @@
 #include <vector>
 #include <format>
 
-#define MAX_SAVED_WORLDS 1
+#define MAX_SAVED_WORLDS 100
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
 const int WIDTH = 1024;
 const int HEIGHT = 1024;
@@ -98,7 +98,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
 
     int numero_creature = 0;
     float *filtro_cu, *creature_cu;
-    float *mondo_cu, *mondo_creature;
+    float *mondo_cu, *mondo_creature_cu;
     float *creature_energy_cu;
     int *id_matrix_cu;
     unsigned char *mondo_cu_save, *id_matrix_cu_save;
@@ -140,8 +140,8 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     controllo_errore_cuda("allocazione memoria matrice_index_out su GPU", cudaMallocAsync((void**)&id_matrix_out_cu, dim_mondo*dim_mondo*sizeof(int),stream));
     */
 
-    if(compute_capability>=7) controllo_errore_cuda("allocazione mondo creature", cudaMallocAsync((void**)&mondo_creature, number_of_creatures*dim_mondo*dim_mondo*sizeof(float),stream));
-    else controllo_errore_cuda("allocazione mondo creature", cudaMalloc((void**)&mondo_creature, number_of_creatures*dim_mondo*dim_mondo*sizeof(float)));
+    if(compute_capability>=7) controllo_errore_cuda("allocazione mondo creature", cudaMallocAsync((void**)&mondo_creature_cu, (1+number_of_creatures)*dim_mondo*dim_mondo*sizeof(float),stream));
+    else controllo_errore_cuda("allocazione mondo creature", cudaMalloc((void**)&mondo_creature_cu, (1+number_of_creatures)*dim_mondo*dim_mondo*sizeof(float)));
 
     wrap_add_base_food(mondo_cu, id_matrix_cu, 200, dim_mondo);
     controllo_errore_cuda("Sincronizzazione Stream dopo wrap_add_base_food",cudaStreamSynchronize(stream));
@@ -159,7 +159,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
                 }
             }
 
-            wrap_convolution(mondo_creature,mondo_cu, id_matrix_cu, filtro_cu, mondo_cu_save, id_matrix_cu_save, dim_mondo, dim_filtro, numero_creature, i, stream);
+            wrap_convolution(mondo_creature_cu,mondo_cu, id_matrix_cu, filtro_cu, mondo_cu_save, id_matrix_cu_save, dim_mondo, dim_filtro, numero_creature, i, stream);
 
             //controllo_errore_cuda("Sincronizzazione Stream dopo convoluzioni",cudaStreamSynchronize(stream));
             controllo_errore_cuda("passaggio mondo su CPU", cudaMemcpyAsync(mondo, mondo_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToHost, stream));
@@ -249,6 +249,7 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
     controllo_errore_cuda("liberazione memoria filtro GPU", cudaFree(filtro_cu));
     controllo_errore_cuda("liberazione memoria creature occupation GPU", cudaFree(creature_occupation_cu));
     controllo_errore_cuda("liberazione memoria creature value to GPU", cudaFree(creature_value_tot_cu));
+    controllo_errore_cuda("liberazione memoria mondo creature value to GPU", cudaFree(mondo_creature_cu));
 
     free(mondo);
     free(id_matrix);
