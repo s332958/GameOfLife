@@ -8,7 +8,7 @@
 #define WORLD_OBJECT 1
 
 #define max_increments 5.0f
-#define decay -1.0f
+#define decay -5.0f
 
 //function for convolution
 __global__ void convolution(float *mondo_creature, float *world, int *id_matrix, float* filter,
@@ -113,6 +113,11 @@ __global__ void mondo_cu_update(float *mondo_creature, float *world, int *id_mat
    if(final_value < 20.0f){
         final_id = 0;
    }
+
+   if(final_value > 255.0f){
+        final_value = 255.0f;
+    }
+
     world[index] = final_value;                   
     id_matrix[index] = (int)final_id;  
 
@@ -137,9 +142,9 @@ __global__ void add_base_food(float*mondo, int *id_matrix, float max_food, int d
     curandState state;
     curand_init(1, index, 0, &state);
     float random_number = curand_uniform(&state);
-    if (random_number < 0.995) return;
+    if (random_number < 0.99999) return;
     float increment = random_number*max_food;
-    mondo[index] = 25500.0f;
+    mondo[index] = 255.0f;
     
 }
 

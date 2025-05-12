@@ -11,7 +11,7 @@
 #include <vector>
 #include <format>
 
-#define MAX_SAVED_WORLDS 100
+#define MAX_SAVED_WORLDS 1000
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
 const int WIDTH = 1024;
 const int HEIGHT = 1024;
