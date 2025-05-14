@@ -164,8 +164,8 @@ void simulazione(std::string& world_name, std::vector<std::string>& filters_name
             //controllo_errore_cuda("Sincronizzazione Stream dopo convoluzioni",cudaStreamSynchronize(stream));
             controllo_errore_cuda("passaggio mondo su CPU", cudaMemcpyAsync(mondo, mondo_cu, dim_mondo*dim_mondo*sizeof(float), cudaMemcpyDeviceToHost, stream));
             controllo_errore_cuda("passaggio id_matrix su CPU", cudaMemcpyAsync(id_matrix, id_matrix_cu, dim_mondo*dim_mondo*sizeof(int), cudaMemcpyDeviceToHost, stream));
-
-            mappaColori(mondo, id_matrix, mondo_rgb, dim_mondo, dim_mondo);
+            
+            wrap_mappaColori(mondo, id_matrix, mondo_rgb, dim_mondo, dim_mondo);
 
             if(render){
                 // Carica i dati nella texture OpenGL
