@@ -21,7 +21,7 @@ GLuint textureID;
 
 float colori[21][3]; // 21 perché includiamo l'indice 0
 
-
+// DA IMPLEMENTARE IN GPUUU
 void mappaColori(float* mondo, int* id_matrix, float* mondo_rgb, int width, int height) {
     // Inizializza i colori casuali per i valori da 1 a 20
     srand(static_cast<unsigned int>(time(0))); // Inizializza il seed per rand()
