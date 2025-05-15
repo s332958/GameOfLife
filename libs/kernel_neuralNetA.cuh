@@ -13,5 +13,6 @@ void wrapper_recombination(NeuralNet *neuralNets, NeuralNet *newNeuralNet, int t
 __global__ void recombination(NeuralNet n1, NeuralNet n2, NeuralNet final, int n_random_mutation_x_block, float max_value_mutation, int totalWeights, int totalBiases);
 
 
-void wrap_calcolo_visione(float *mondo_cu, float *mondo_signal, float *input_cu, 
-                        float *output_cu, int*dim_mondo, int*cellCountMax, int*cellule_cu);
+void wrap_neuralForward(float *mondo_cu, int* id_matrix_cu, float *mondo_signal, float *input_cu, 
+                        float *output_cu, int*dim_mondo, int*cellCountMax, int*cellule_cu, float* allParams_cu,
+                        int totWB, int number_of_creature);

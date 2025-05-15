@@ -155,26 +155,47 @@ __global__ void recombination(NeuralNet n1, NeuralNet n2, NeuralNet final, int n
 
 
 
-__global__ void kernel_visione(float* mondo_cu, float* mondo_signal_cu, int dim_mondo){
-    if (threadid.x > dim_visione || threadid.y > dim_visione) return;
+__global__ void kernel_visione(int* cellule_cu, float* mondo_cu, float* mondo_signal_cu, float* input_cu, int dim_inputs, int dim_mondo,int thread_number){
+    int index = blockIdx.x*blockDim.x + threadIdx.x;    
+    if (index > thread_number) return;
+    int numero_cella = index / dim_inputs;
+    int cell_index = cellule_cu[numero_cella];
+    
+    int channel = 0; //mondo o mondo_signal?
+    if (index % dim_inputs > dim_inputs/2){
+        channel = 1;
+    }
+    int input_index = index % (dim_inputs / 2);
+    int dim_finestraVisione = sqrt(dim_inputs/2)/2;
+
     radius_filter = dim_finestraVisione / 2;
 
-    int filtro_x = (threadIdx.x - radius_filter + centro_x) % dim_mondo;
-    int filtro_y = (threadIdx.y - radius_filter + centro_y) % dim_mondo;
-    int filtro_index = filtro_y * dim_world + filtro_x;
+    int centro_x = cell_index % dim_mondo; 
+    int centro_y = cell_index / dim_mondo;
 
-    int visione_index = filtro_y * dim_visione + filtro_x;
-    visione[visione_index] = mondo_cu[filtro_index];
-    visione[visione_index + dim_visione * dim_visione] = mondo_signal_cu[filtro_index];
+    int filtro_x = (input_index % dim_finestraVisione - radius_filter + centro_x) % dim_mondo;
+    int filtro_y = (input_index / dim_finestraVisione - radius_filter + centro_y) % dim_mondo;
+    int filtro_index = filtro_y * dim_world + filtro_x;
+    
+    if (channel = 0){
+        input_cu[numero_cella*dim_inputs + channel*dim_inputs/2 + input_index] =  mondo_cu[filtro_index];        
+    }
+    else:{
+        input_cu[numero_cella*dim_inputs + channel*dim_inputs/2 + input_index] =  mondo_signal_cu[filtro_index];
+    }
 }
 
 
+
+
 // Funzione membro che lancia il kernel
-void wrap_calcolo_visione(float *mondo_cu, float *mondo_signal, float *input_cu, float *output_cu, int*dim_mondo, int*cellCountMax, int*cellule_cu, int cellCount_cu ) {
+void wrap_neuralForward(float *mondo_cu, int* id_matrix_cu, float *mondo_signal, float *input_cu, int dim_inputs, float *output_cu, int dim_outputs, int*dim_mondo, int*cellCountMax,
+                         int*cellule_cu, int cellCount_cu,float* allParams_cu, int totWB, int number_of_creature) {
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
     int iterations;
     int thread_number = 0;
+    //lavoro diviso in base al numero massimo di cellule per batch
     if(cellCount_cu % cellCountMax == 0){
 
         iterations = cellCount_cu / cellCountMax;
@@ -187,19 +208,28 @@ void wrap_calcolo_visione(float *mondo_cu, float *mondo_signal, float *input_cu,
         if(i = iterations - 1): 
         {
             thread_number = cellCount_cu - cellCountMax  * iterations
-        }else:
+        }else:{
             thread_number = cellCountMax;
-    }
-    //computation number of thread and block for launch kernel (use max thread for dimension before launch new block)
-    int n_thread_per_block = properties.maxThreadsPerBlock;
-    int thread_per_dimension = sqrt(n_thread_per_block);
-    int n_block = dim_world / thread_per_dimension;
-    if(n_block%thread_per_dimension!=0 || n_block==0) n_block=n_block+1
+        }
+        thread_number = thread_number * dim_inputs;
 
-    dim3 thread_number = dim3(thread_per_dimension, thread_per_dimension);  
-    dim3 block_number = dim3(n_block, n_block); 
-    kernel_visione<<<block_number,thread_number,0,stream>>>(mondo_cu, mondo_signal_cu, dim_mondo);
-    cudaDeviceSynchronize();  // opzionale per il debug
+        int n_thread_per_block = properties.maxThreadsPerBlock;
+        int n_block = thread_number / n_thread_per_block;
+        if(n_block%n_thread_per_block!=0 || n_block==0)
+        {
+            n_block=n_block+1;  
+        } 
+    
+        kernel_visione<<<n_block,n_thread_per_block,0,stream>>>(cellule_cu, mondo_cu, mondo_signal_cu, input_cu, dim_inputs, dim_mondo, thread_number);
+        
+        for (int i = iterations*cellCountMax; i < (iterations+1)*cellCountMax; i++){
+            kernel_NN<<<>>>(i, cellule_cu, id_matrix_cu, input_cu, dim_inputs, output_cu, dim_outputs, totWB, number_of_creatures); //int i scorre l'array di indirizzi cellule sono delle cellule di cui abbiamo salvato l'input
+        }//indicizzato come multipli di totWB per avere i parametri per cellula
+
+        kernel_output_elaboration<<<>>>(cellule_cu, output_cu, dim_outputs, mondo_creature_cu, mondo_signal, matrix_id) 
+        //riempie mondo_creature e aggiorna mondo_signal usando output_cu
+        //usare matrix_id per rimappare i valori da 0 a 1 in un channel ID
+    }                                                                   
 }
 
 
