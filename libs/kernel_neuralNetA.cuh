@@ -1,24 +1,7 @@
-#pragma once
 #include <cuda_runtime.h>
 
-struct NeuralNet {
-    int numLayers;
-    int* h_layerSizes;  // host
-    int* d_layerSizes;  // device
-
-    float* d_weights;
-    float* d_biases;
-
-    int totalWeights;
-    int totalBiases;
-
-    NeuralNet(int* sizes, int nLayers, float* allParams);
-    ~NeuralNet();
-
-    void clear();
-    void forwardOnDevice(const float* h_input, float* h_output);
-    
-};
+#ifndef KERNEL
+#define KERNEL
 
 
 void argsort_bubble(int *vettore, int *indice, int n);
@@ -28,3 +11,7 @@ void wrapper_recombination(NeuralNet *neuralNets, NeuralNet *newNeuralNet, int t
     int type_of_union, int random_mutation_x_block, int dim_block, float max_varaiation_mutation,cudaStream_t stream);
 
 __global__ void recombination(NeuralNet n1, NeuralNet n2, NeuralNet final, int n_random_mutation_x_block, float max_value_mutation, int totalWeights, int totalBiases);
+
+
+void wrap_calcolo_visione(float *mondo_cu, float *mondo_signal, float *input_cu, 
+                        float *output_cu, int*dim_mondo, int*cellCountMax, int*cellule_cu);

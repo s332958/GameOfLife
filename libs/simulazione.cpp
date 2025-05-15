@@ -3,18 +3,24 @@
 
 //inizializzazione
 const int dim_mondo = WIDTH;
-const int MaxPixel = WIDTH * HEIGHT;
+const int MaxPixel = dim_mondo * dim_mondo;
+const float memoriaGB = 2;
+const int numero_stream = 1;
 //const int Races = 10;
 //const int SubRaces = 10;
 //number_of_creatures = SubRaces * Races;
 
-Cellula cellule[MaxPixel];
-cellCount = 0;
+int cellule[MaxPixel];
+int cellCount = 0;
 
 NeuralNet NNmodels [number_of_creatures]; 
+int dim_inputs = 162;
+int dim_outputs = 10;
 
-int layers [] = {81, 16, 16, 10};
+int layers [] = {inputs, 16, 16, dim_outputs};
 int numLayers = layers.size();
+int totW = 0;
+int totB = 0; 
 int totWB = 0;
 
 float *mondo_signal_cu,
@@ -24,25 +30,32 @@ else controllo_errore_cuda("allocazione mondo", cudaMalloc((void**)&mondo_signal
 
 //calcolo numero di parametri:
 for (int i = 1; i < numLayers; ++i) {
-    totWB += sizes[i - 1] * sizes[i]; //weights
-    totWB += sizes[i]; //biases
+    totW += sizes[i - 1] * sizes[i]; //weights
+    totB += sizes[i]; //biases
 }
-
+totWB = totW + totB;
 //riempimento di array cellule:
 for(int i = 0; i < MaxPixel; i++){
     if(mondo[i] > 0){
-        cellule[cellCount] = Cellula(cellCount, mondo_id[cellCount] + rand(SubRaces));//assegnato ad una razza e sottorazza
+        cellule[cellCount] = i;//assegnato ad una razza e sottorazza
         cellCount = cellCount + 1;
     }    
 }
 //riempimento iniziale di array NNmodels:
 //idealmente razze definite da valori random e sottorazze definite da piccoli incrementi o decrementi dei valori random
 float params [totWB];
+int dim_allparams = totWB * number_of_creatures;
+float allparams [dim_allparams];
+int value;
+
 for (int i = 0; i < number_of_creatures; i++){
     for (int i = 0; i < totWB; i++){
-        params [i] = rand();
+        value = rand();
+        params [i] = value;
+        allparams [dim_allparams] = value;
+        dim_allparams = dim_allparams + 1;
     }  
-    NNmodels [i] = new NeuralNet (layers, numLayers, params);
+    NNmodels [i] = new NeuralNet (layers, numLayers, params, totW, totB);
 }
 
 
@@ -65,43 +78,46 @@ for (int i = 0; i < Races; i++){
 */
 
 //trasferimento di cellule[] e di NNmodels[] su GPU:
-int *cellCount_cu;
-int *mask_cu;
-Cellula *cellule_cu;
-NeuralNet *NNmodels_cu;
-float *NNmodels_evaluation_cu;
+cellCountMax = (memoriaGB * 1073741824 - dim_allparams * 4)/(dim_inputs + dim_outputs) * 4;   
+cellCountMax = cellCountMax / numero_stream;
 
+int *cellCount_cu, *mask_cu, *cellule_cu;
 if(compute_capability>=7) controllo_errore_cuda("allocazione cellCount_cu", cudaMallocAsync((void**)&cellCount_cu, sizeof(int),stream));
 else controllo_errore_cuda("allocazione cellCount_cu", cudaMalloc((void**)&cellCount_cu, sizeof(int)));
+if(compute_capability>=7) controllo_errore_cuda("allocazione mask_cu", cudaMallocAsync((void**)&mask_cu, MaxPixel*sizeof(int),stream));
+else controllo_errore_cuda("allocazione mask_cu", cudaMalloc((void**)&mask_cu, MaxPixel*sizeof(int)));
+if(compute_capability>=7) controllo_errore_cuda("allocazione cellule_cu", cudaMallocAsync((void**)&cellule_cu, MaxPixel*sizeof(int),stream));
+else controllo_errore_cuda("allocazione cellule_cu", cudaMalloc((void**)&cellule_cu, MaxPixel*sizeof(int)));
 
-if(compute_capability>=7) controllo_errore_cuda("allocazione cellCount_cu", cudaMallocAsync((void**)&mask_cu, MaxPixel*sizeof(int),stream));
-else controllo_errore_cuda("allocazione cellCount_cu", cudaMalloc((void**)&mask_cu, MaxPixel*sizeof(int)));
 
-if(compute_capability>=7) controllo_errore_cuda("allocazione mondo", cudaMallocAsync((void**)&cellule_cu, MaxPixel*sizeof(Cellula),stream));
-else controllo_errore_cuda("allocazione mondo", cudaMalloc((void**)&cellule_cu, MaxPixel*sizeof(Cellula)));
 
-if(compute_capability>=7) controllo_errore_cuda("allocazione mondo", cudaMallocAsync((void**)&NNmodels_cu, number_of_creatures*sizeof(NeuralNet),stream));
-else controllo_errore_cuda("allocazione mondo", cudaMalloc((void**)&NNmodels_cu, number_of_creatures*sizeof(NeuralNet)));
+float *allParams_cu, *NNmodels_evaluation_cu, *input_cu, *output_cu;
+if(compute_capability>=7) controllo_errore_cuda("allocazione allParams_cu", cudaMallocAsync((void**)&allParams_cu, dim_allparams*sizeof(float),stream));
+else controllo_errore_cuda("allocazione allParams_cu", cudaMalloc((void**)&allParams_cu, dim_allparams*sizeof(float)));
+if(compute_capability>=7) controllo_errore_cuda("allocazione NNmodels_evaluation_cu", cudaMallocAsync((void**)&NNmodels_evaluation_cu, number_of_creatures*sizeof(float),stream));
+else controllo_errore_cuda("allocazione NNmodels_evaluation_cu", cudaMalloc((void**)&NNmodels_evaluation_cu, number_of_creatures*sizeof(float)));
+if(compute_capability>=7) controllo_errore_cuda("allocazione input_cu", cudaMallocAsync((void**)&input_cu, cellCountMax*dim_inputs*sizeof(float),stream));
+else controllo_errore_cuda("allocazione input_cu", cudaMalloc((void**)&input_cu, cellCountMax*dim_inputs*sizeof(float)));
+if(compute_capability>=7) controllo_errore_cuda("allocazione *output_cu", cudaMallocAsync((void**)&output_cu, cellCountMax*dim_outputs*sizeof(float),stream));
+else controllo_errore_cuda("allocazione *output_cu", cudaMalloc((void**)&output_cu, cellCountMax*dim_outputs*sizeof(float)));
 
-if(compute_capability>=7) controllo_errore_cuda("allocazione mondo", cudaMallocAsync((void**)&NNmodels_evaluation_cu, number_of_creatures*sizeof(float),stream));
-else controllo_errore_cuda("allocazione mondo", cudaMalloc((void**)&NNmodels_evaluation_cu, number_of_creatures*sizeof(float)));
-
-controllo_errore_cuda("passaggio cellule_cu su GPU", cudaMemcpyAsync(cellule_cu, cellule, MaxPixel*sizeof(Cellula), cudaMemcpyHostToDevice, stream));
-controllo_errore_cuda("passaggio NNmodels_cu su GPU", cudaMemcpyAsync(NNmodels_cu, NNmodels, number_of_creatures*sizeof(NeuralNet), cudaMemcpyHostToDevice, stream));
+controllo_errore_cuda("passaggio cellule_cu su GPU", cudaMemcpyAsync(allParams_cu, allparams, dim_allparams*sizeof(float), cudaMemcpyHostToDevice, stream));
+controllo_errore_cuda("passaggio cellule_cu su GPU", cudaMemcpyAsync(cellule_cu, cellule, MaxPixel*sizeof(int), cudaMemcpyHostToDevice, stream));
 controllo_errore_cuda("passaggio cellCount_cu su GPU", cudaMemcpyAsync(cellCount_cu, cellCount, sizeof(int), cudaMemcpyHostToDevice, stream));
 
 //simulazione:
 for (int k = 0; k < NSimulazioni, k++){
 
     for (int j = 0; j < MaxSimulazione; j++){
+        wrap_calcolo_visione(mondo_cu, mondo_signal, input_cu, output_cu, dim_mondo, cellCountMax, cellule_cu, cellCount_cu); 
         for (int i = 0; i < cellCount; i++){        
             //calcolo valori di input:
-            cellule_cu[i].launch_calcolo_visione(mondo_cu, mondo_signal, dim_mondo);        
+                   
         }
 
         for (int i = 0; i < cellCount; i++){              
             //Forward nel NN:
-            NNmodels_cu[cellule_cu[i].ID].forwardOnDevice(cellule_cu[i].visione, cellule_cu[i].output);
+            forwardOnDevice(input_cu[i*dim_inputs], output_cu[i*dim_inputs], );
         }
     
         //(in kernel.cu) modifica mondo_cu e mondo_signals_cu usando il vettore Output aggiornato in ogni cellula di cellule_cu
