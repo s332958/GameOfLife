@@ -8,11 +8,9 @@ Devo fixare la parte che conta le celle vive, non funziona in modo corretto, me 
 
 
 da fare:
-    fixare il conto delle cellule 
     aggiungere il foreward 
     aggiungere i contributi delle celle
     aggiungere l'aggiornamento del mondo
-    aggiungere il sorting dei punteggi 
 
  c1  c2  c3  c4
 100 100 100 100 double 64 bit

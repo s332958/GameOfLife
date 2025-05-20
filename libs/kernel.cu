@@ -394,7 +394,51 @@ __global__ void vision_kernel(
 
 
 
+// ============================================================================
 
+
+
+__global__ void compute_contribution_kernel(
+    float *world_value,
+    int *world_id,
+    float *world_signaling,
+    float *contribution_matrix,
+    float *output,
+    int *alive_cell_vector,
+    int world_dim,
+    int output_dim,
+    int idx_workspace,
+    int idx_alive_cell
+){
+
+    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+
+    if(idx>=output_dim) return;
+
+    //richiesto che l'ouput sia una matrice quadrata + 1 output per il signaling
+    int raggio = sqrt(output_dim-1);
+
+    int world_idx = alive_cell_vector[idx_alive_cell];
+    int world_x = world_idx%world_dim;
+    int world_y = world_idx/world_dim;
+
+    int id_cell_alive = world_id[world_idx];
+    int value_cell_alive = world_value[world_idx];
+
+    if(idx==output_dim-1){
+        world_signaling[world_idx] = output[idx];
+    }
+
+    if(idx<raggio){
+        int output_y = (idx/raggio) - raggio;
+        int output_x = (idx%raggio) - raggio;
+        int idx_contribution_x = (world_dim + world_x + output_x) % world_dim;
+        int idx_contribution_y = (world_dim + world_y + output_y) % world_dim;
+        int idx_contribution = idx_contribution_x + idx_contribution_y*world_dim + id_cell_alive*world_dim*world_dim;
+        contribution_matrix[idx_contribution] += output[idx + output_dim*idx_workspace]*value_cell_alive;
+    }
+
+}
 
 
 
@@ -609,6 +653,44 @@ void launch_vision(
     dim3 threads(n_thread,n_thread);
     dim3 blocks(n_block,n_block);
     vision_kernel<<<blocks,threads,0,stream>>>(world_value,world_id,world_signaling,dim_world,cell_idx,raggio,input_workspace,input);
+
+
+}
+
+
+
+//Wrapper for launch contribution
+void launch_compute_contribution(
+    float *world_value,
+    int *world_id,
+    float *world_signaling,
+    float *contribution_matrix,
+    float *output,
+    int *alive_cell_vector,
+    int world_dim,
+    int output_dim,
+    int idx_workspace,
+    int idx_alive_cell,
+    cudaStream_t stream
+){
+
+    int n_thread = 1024;
+    if(n_thread>output_dim) n_thread=output_dim;
+    int n_block = (output_dim+n_thread-1)/n_thread;
+
+    compute_contribution_kernel<<<n_block,n_thread,0,stream>>>(
+        world_value,
+        world_id,
+        world_signaling,
+        contribution_matrix,
+        output,
+        alive_cell_vector,
+        world_dim,
+        output_dim,
+        idx_workspace,
+        idx_alive_cell
+    );
+
 
 
 }

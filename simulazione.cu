@@ -228,6 +228,11 @@ void simulazione(
                         printf("LANCIO KERNEL VISION \n");
                         // - Calcolo output e aggiorno cella signaling
                         // - Calcolo matrice dei contributi 
+                        launch_compute_contribution(                //da testare 
+                            world_value_d,world_id_d,signaling_d,
+                            contribution_d,workspace_output_d,alive_cells_d,
+                            world_dim, dim_output, i, idx_cell, streams[i]
+                        );
                     }
                     cudaDeviceSynchronize();
                     CUDA_CHECK(cudaGetLastError());
