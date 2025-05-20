@@ -1,0 +1,18 @@
+La parte di generazione e allocazione ha senso farlo con uno stream unico, siccome le operazioni sono istantanee
+Gli stream servono solo durante la workspace
+Usare gli i malloc async e free async non conviene sotto i cc 7.0
+
+
+Devo fixare la parte che conta le celle vive, non funziona in modo corretto, me ne mette molte di piu a cazzo
+
+
+
+da fare:
+    fixare il conto delle cellule 
+    aggiungere il foreward 
+    aggiungere i contributi delle celle
+    aggiungere l'aggiornamento del mondo
+    aggiungere il sorting dei punteggi 
+
+ c1  c2  c3  c4
+100 100 100 100 double 64 bit
