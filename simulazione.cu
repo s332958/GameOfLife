@@ -222,17 +222,23 @@ void simulazione(
                 for(int i=0; i<n_workspace; i++){
                     int idx_cell = i+offset;
                     if(idx_cell<*n_cell_alive_h){
+
                         // - Calcolo input 
                         launch_vision(world_value_d,world_id_d,signaling_d,world_dim,alive_cells_d+idx_cell,vision,i,workspace_input_d,streams[i]);
                         CUDA_CHECK(cudaGetLastError());
                         printf("LANCIO KERNEL VISION \n");
+
                         // - Calcolo output e aggiorno cella signaling
+
                         // - Calcolo matrice dei contributi 
                         launch_compute_contribution(                //da testare 
                             world_value_d,world_id_d,signaling_d,
                             contribution_d,workspace_output_d,alive_cells_d,
                             world_dim, dim_output, i, idx_cell, streams[i]
                         );
+                        CUDA_CHECK(cudaGetLastError());
+                        printf("CALCOLO DEI CONTRIBUTI \n");
+
                     }
                     cudaDeviceSynchronize();
                     CUDA_CHECK(cudaGetLastError());
