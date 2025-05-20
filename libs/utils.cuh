@@ -225,7 +225,8 @@ void compact_positive(int* d_input, int* d_output, int N, int* dim_output_h) {
 }
 */
 
-void argsort_bubble(float *vettore, int *indice, int n) {
+template <typename T>
+void argsort_bubble(T *vettore, int *indice, int n) {
     for (int i = 0; i < n; i++) indice[i] = i;
 
     for (int i = 0; i < n - 1; i++) {

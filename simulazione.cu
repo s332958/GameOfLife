@@ -89,7 +89,7 @@ void simulazione(
     int   *alive_cells_d       = (int*)   cuda_allocate(tot_world_dim_size, cc_major, streams[0]);
     float *energy_vector_d     = (float*) cuda_allocate(tot_eval_vector_size, cc_major, streams[0]);
     int   *occupation_vector_d = (int*)   cuda_allocate(tot_eval_vector_size, cc_major, streams[0]);
-    int   *creature_ordered_d  = (int*)   cuda_allocate(tot_eval_vector_size, cc_major, streams[0]);
+    //int   *creature_ordered_d  = (int*)   cuda_allocate(tot_eval_vector_size, cc_major, streams[0]);
     float *new_model_weights_d = (float*) cuda_allocate(tot_models_weight_size, cc_major, streams[0]);
     float *new_model_biases_d  = (float*) cuda_allocate(tot_models_bias_size, cc_major, streams[0]);
     int   *n_cell_alive_d      = (int*)   cuda_allocate(sizeof(int), cc_major, streams[0]);
@@ -275,16 +275,7 @@ void simulazione(
         // FASE 3 : generazione nuove creature 
         // -------------------------------------------
 
-        // - Ordinamento punteggi creature
-        /*
-        if(METHOD_EVAL==0) sort_indices_by_values_desc(energy_vector_d,creature_ordered_d,n_creature);
-        else sort_indices_by_values_desc(occupation_vector_d,creature_ordered_d,n_creature);
-        */
         int limit = n_creature * 0.4f;
-
-        // - spostamento vettore ordinato su HOST
-        // cuda_memcpy(creature_ordered_h,creature_ordered_d,tot_eval_vector_size,cudaMemcpyDeviceToHost,cc_major, streams[0]);
-        // CUDA_CHECK(cudaGetLastError());
 
         // - spostamento vettore energia su HOST
         cuda_memcpy(energy_vector_h,energy_vector_d,tot_eval_vector_size,cudaMemcpyDeviceToHost,cc_major, streams[0]);
@@ -292,6 +283,10 @@ void simulazione(
         // - spostamento vettore occupazione su HOST
         cuda_memcpy(occupation_vector_h,occupation_vector_d,tot_eval_vector_size,cudaMemcpyDeviceToHost,cc_major, streams[0]);
         CUDA_CHECK(cudaGetLastError());
+
+        // - Ordinamento punteggi creature
+        if(METHOD_EVAL==0) argsort_bubble(energy_vector_h,creature_ordered_h,n_creature);
+        if(METHOD_EVAL==1) argsort_bubble(occupation_vector_h,creature_ordered_h,n_creature);
 
         printf("-----------------------------PUNTEGGI CREATURE----------------------\n");
         for(int i=0; i<n_creature; i++) printf("%3d) energy: %f occupation: %d\n",i+1,energy_vector_h[i],occupation_vector_h[i]);
@@ -353,7 +348,7 @@ void simulazione(
     cuda_Free(alive_cells_d, cc_major, streams[0]);
     cuda_Free(occupation_vector_d, cc_major, streams[0]);
     cuda_Free(energy_vector_d, cc_major, streams[0]);
-    cuda_Free(creature_ordered_d,cc_major,streams[0]);
+    //cuda_Free(creature_ordered_d,cc_major,streams[0]);
     cuda_Free(workspace_input_d, cc_major, streams[0]);
     cuda_Free(workspace_output_d, cc_major, streams[0]);
     cuda_Free(new_model_weights_d, cc_major, streams[0]);
@@ -386,8 +381,8 @@ int main() {
     size_t dim_free = 1024*1024;
     int dim_world = 10;
     int n_creature = 10;
-    int const EPHOCS = 1;
-    int const STEPS = 4;
+    int const EPHOCS = 10;
+    int const STEPS = 400;
     int const MAX_WORKSPACE = 10;
     int const EVAL_TYPE = 1;
     float *weight_model = nullptr;

@@ -377,7 +377,7 @@ __global__ void vision_kernel(
 
     int center_row = *cell_idx / dim_world;
     int center_col = *cell_idx % dim_world;
-    printf("%d\n",*cell_idx);
+    //printf("%d\n",*cell_idx);
 
     // Calcola coordinate "virtuali" senza wrapping
     int world_row = (center_row - (raggio / 2) + y + dim_world) % dim_world;
