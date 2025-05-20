@@ -383,8 +383,8 @@ __global__ void vision_kernel(
     int world_row = (center_row - (raggio / 2) + y + dim_world) % dim_world;
     int world_col = (center_col - (raggio / 2) + x + dim_world) % dim_world;
 
-    int offset = (y * raggio + x) * 3;
-    int workspace_offset = input_workspace*raggio*raggio*3*input_workspace;
+    int offset = y*raggio + x;
+    int workspace_offset = input_workspace*raggio*raggio*3;
 
     int world_pos = world_row * dim_world + world_col;
     input[workspace_offset + offset + 0] = world_value[world_pos];
