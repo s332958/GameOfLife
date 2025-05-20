@@ -2,7 +2,6 @@
 #include <curand_kernel.h>
 #include <random>
 
-
 // =========================================================================================================
 
 __global__ void add_objects_to_world(float *world_value, int *world_id, int dim_world, 
@@ -200,7 +199,7 @@ __global__ void find_index_cell_alive_kernel(
 
     if (idx < world_dim_tot) {
         is_alive = (world_id[idx] > 0);
-        cell_alive_vector[idx] = is_alive * idx;
+        cell_alive_vector[idx] = is_alive * (idx+1);
     }
 
     // Scriviamo il valore nella shared memory (0 se fuori dai limiti)
@@ -223,8 +222,9 @@ __global__ void find_index_cell_alive_kernel(
     }
 }
 
+/*
 
-__global__ void compact_cell_alive_kernel_pt1(int *alive_cell_vector, int *support_vector, int *n_alive_cell, int n_block){
+__global__ void compact_cell_alive_kernel_pt1(int *alive_cell_vector, int *support_vector, int *n_alive_cell, int world_dim){
     extern __shared__ int shared_mem[]; 
     // dim n_thread*2+1  
     // last memory cell have the local_count of the block
@@ -238,8 +238,11 @@ __global__ void compact_cell_alive_kernel_pt1(int *alive_cell_vector, int *suppo
 
     //printf("----------------------alive Cell numbers: %d",n_alive_cell);
 
-    if(idx<*n_alive_cell){
+    if(idx<world_dim){
         shared_mem[threadIdx.x] = alive_cell_vector[idx];
+        shared_mem[threadIdx.x+blockDim.x] = 0;
+    }else{
+        shared_mem[threadIdx.x] = 0;
         shared_mem[threadIdx.x+blockDim.x] = 0;
     }
 
@@ -248,11 +251,18 @@ __global__ void compact_cell_alive_kernel_pt1(int *alive_cell_vector, int *suppo
     if(threadIdx.x==0){
         int local_count = 0;
         for(int i=0; i<blockDim.x;i ++){
-            if(shared_mem[i]>0){
+            if(shared_mem[i]>0 && blockDim.x+local_count<blockDim.x*2){
                 shared_mem[blockDim.x+local_count] = shared_mem[i];
                 local_count++;
             }
         }
+
+        printf("VETT ORD: ");
+        for(int i=0; i<local_count;i++){
+            printf("%d ",shared_mem[i+blockDim.x]);
+        }
+        printf("\n");
+
         shared_mem[blockDim.x*2] = local_count;
         support_vector[blockIdx.x] = local_count;
     }
@@ -265,8 +275,58 @@ __global__ void compact_cell_alive_kernel_pt1(int *alive_cell_vector, int *suppo
 
 }
 
+*/
 
-__global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *support_vector, int *n_alive_cell, int n_block, int n_thread){
+__global__ void compact_cell_alive_kernel_pt1(
+    int *alive_cell_vector,
+    int *support_vector,
+    int *n_alive_cell,
+    int world_dim
+) {
+    extern __shared__ int shared_mem[]; // [2 * blockDim.x + 1]
+
+    int global_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int local_idx = threadIdx.x;
+
+    // Clear shared memory
+    shared_mem[local_idx] = 0;
+    shared_mem[blockDim.x + local_idx] = 0;
+
+    // Carica in shared
+    if (global_idx < world_dim) {
+        shared_mem[local_idx] = alive_cell_vector[global_idx];
+        alive_cell_vector[global_idx] = 0;
+    }
+
+    __syncthreads();
+
+    // Filtro: fatto da thread 0
+    if (local_idx == 0) {
+        int count = 0;
+        for (int i = 0; i < blockDim.x; i++) {
+            int val = shared_mem[i];
+            if (val > 0) {
+                shared_mem[blockDim.x + count] = val;
+                count++;
+            }
+        }
+
+        shared_mem[2 * blockDim.x] = count;
+        support_vector[blockIdx.x] = count;
+    }
+
+    __syncthreads();
+
+    // Scrittura valori filtrati nel buffer alive (solo entro limiti)
+    int count = shared_mem[2 * blockDim.x];
+    if (local_idx < count) {
+        alive_cell_vector[global_idx] = shared_mem[blockDim.x + local_idx];
+    }
+}
+
+
+
+__global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *support_vector, int *n_alive_cell, int n_block, int dim_block){
 
     __shared__ int shared_mem[2];       
     //mem[0] starting index, mem[1] number of element 
@@ -285,11 +345,12 @@ __global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *suppo
 
     __syncthreads();
 
-    int idx_alive_cell_read = n_block*n_thread+idx;
-    if(idx<shared_mem[1] && idx_alive_cell_read<*n_alive_cell){
+    int idx_alive_cell_read = n_block*dim_block+idx;
+    if(idx<shared_mem[1]){
         int offset = shared_mem[0];
+        //printf("read cell: %d \n",idx_alive_cell_read);
         int idx_alive_cell_write = offset+idx;
-        alive_cell_vector[idx_alive_cell_write] = alive_cell_vector[idx_alive_cell_read];
+        alive_cell_vector[idx_alive_cell_write] = alive_cell_vector[idx_alive_cell_read]-1;
     }
 
 
@@ -483,12 +544,12 @@ void launch_find_index_cell_alive(
     int world_dim_tot,
     int *alive_cell_vector,
     int *n_cell_alive_d,
+    int *n_cell_alive_h,
     int *support_vector,
     cudaStream_t stream
 ) {
     int n_thread = 1024;
     if(world_dim_tot<n_thread) n_thread = world_dim_tot;
-    // if(n_thread%2==1) n_thread++;
     int n_block = (world_dim_tot+n_thread-1) / n_thread;
 
     cudaMemsetAsync(n_cell_alive_d, 0, sizeof(int),stream);
@@ -500,31 +561,30 @@ void launch_find_index_cell_alive(
         n_cell_alive_d
     );
 
-    int n;
-    cudaMemcpy(&n,n_cell_alive_d,sizeof(int),cudaMemcpyDeviceToHost);
-    printf("================================ n: %d ============================\n",n);
+    cudaMemcpyAsync(n_cell_alive_h,n_cell_alive_d,sizeof(int),cudaMemcpyDeviceToHost,stream);
 
-    n_thread = 32;
+    n_thread = (world_dim_tot*0.2);
     n_block = (world_dim_tot+n_thread-1) / n_thread;
 
     compact_cell_alive_kernel_pt1<<<n_block,n_thread,sizeof(int)*(n_thread*2+1),stream>>>(
         alive_cell_vector,
         support_vector,
         n_cell_alive_d,
-        n_block
+        world_dim_tot
     );
 
-    for(int i=0; i<n_block; i++){
+    int block_dim_pt1 = n_thread;
+    int n_block_pt1 = n_block;
+
+    for(int i=0; i<n_block_pt1; i++){
         compact_cell_alive_kernel_pt2<<<1,n_thread,0,stream>>>(
             alive_cell_vector,
             support_vector,
             n_cell_alive_d,
             i,
-            n_thread
+            block_dim_pt1
         );
     }
-
-    
 
 
 }

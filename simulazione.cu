@@ -192,13 +192,11 @@ void simulazione(
         printf("ADD ELEMENTS TO WORLD\n");
 
         // - Calcolo cellule vive
-        launch_find_index_cell_alive(world_id_d,world_dim*world_dim,alive_cells_d,n_cell_alive_d,support_vector_d,streams[0]);
+        launch_find_index_cell_alive(world_id_d,world_dim*world_dim,alive_cells_d,n_cell_alive_d,n_cell_alive_h,support_vector_d,streams[0]);
         CUDA_CHECK(cudaGetLastError());
 
         printf("COMPUTE ALIVE CELLS %d\n",*n_cell_alive_h);
 
-        // - Ritorno valore celle vive
-        cuda_memcpy(n_cell_alive_h,n_cell_alive_d,sizeof(int),cudaMemcpyDeviceToHost,cc_major, streams[0]);
         // - Ritorno mondo valori
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size, cudaMemcpyDeviceToHost, cc_major, streams[0]);
         CUDA_CHECK(cudaGetLastError());
@@ -243,7 +241,7 @@ void simulazione(
             // - Aggiornamento matrice valori ed id
 
             // - Aggiornamento numero cellule vive
-            launch_find_index_cell_alive(world_id_d,world_dim*world_dim,alive_cells_d,n_cell_alive_d,support_vector_d,streams[0]);
+            launch_find_index_cell_alive(world_id_d,world_dim*world_dim,alive_cells_d,n_cell_alive_d,n_cell_alive_h,support_vector_d,streams[0]);
             CUDA_CHECK(cudaGetLastError());
 
             printf("COMPUTE ALIVE CELLS %d\n",*n_cell_alive_h);
@@ -260,8 +258,6 @@ void simulazione(
             CUDA_CHECK(cudaGetLastError());
             printf("RESET CONTRIBUTION MATRIX \n");
 
-            // - Ritorno numero celle vive
-            cuda_memcpy(n_cell_alive_h,n_cell_alive_d,sizeof(int),cudaMemcpyDeviceToHost,cc_major, streams[0]);
             // - Ritorno mondo valori
             cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size, cudaMemcpyDeviceToHost, cc_major, streams[0]);
             CUDA_CHECK(cudaGetLastError());
