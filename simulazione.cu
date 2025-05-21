@@ -71,6 +71,13 @@ void simulazione(
     if(biases_models==nullptr)  model_biases_h = (float*) malloc(tot_models_bias_size);
     else model_biases_h        = biases_models;
 
+    // Creazione Mondo con creature ------------------------------------------------------Cambiato
+    for (int = 0, i < n_creature, i++){
+        int random_index = rand() % world_dim*world_dim;
+        world_value_h[random_index] = 1;
+        world_id_h[random_index] = i + 1;
+    }
+
     // stream CUDA
     int n_stream = MAX_WORKSPACE;
     int a_stream = -1;
@@ -178,19 +185,26 @@ void simulazione(
         CUDA_CHECK(cudaGetLastError());
 
         printf("RESET ALL MATRIX \n");
+        
+        // - Aggiunta creature al mondo -------------------------------------------------------Cambiato
+        cuda_memcpy(world_value_d, world_value_h, tot_world_dim_size, cudaMemcpyHostToDevice, cc_major, streams[0]);
+        CUDA_CHECK(cudaGetLastError());
 
+    
+
+        /*
         // - Aggiunta ostacoli al mondo
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, streams[0]);
         CUDA_CHECK(cudaGetLastError());
+        */
+
+
         // - Aggiunta cibo al mondo
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.2f, streams[0]);
         CUDA_CHECK(cudaGetLastError());
-        // - Aggiunta creature al mondo 
-        launch_add_creatures(world_value_d, world_id_d, world_dim, n_creature, streams[0]);
-        CUDA_CHECK(cudaGetLastError());
 
         printf("ADD ELEMENTS TO WORLD\n");
-
+            
         // - Calcolo cellule vive
         launch_find_index_cell_alive(world_id_d,world_dim*world_dim,alive_cells_d,n_cell_alive_d,n_cell_alive_h,support_vector_d,streams[0]);
         CUDA_CHECK(cudaGetLastError());
@@ -228,24 +242,42 @@ void simulazione(
                         CUDA_CHECK(cudaGetLastError());
                         printf("LANCIO KERNEL VISION \n");
 
-                        // - Calcolo output e aggiorno cella signaling
+                        void NN_forward(
+                            float* input,
+                            float* output,
+                            float* weights,
+                            int n_weights,
+                            float* biases,
+                            int n_biases,
+                            int* structure,
+                            int cellule_index,
+                            int *cellule,
+                            int* matrice_id    
+                        )
 
-                        // - Calcolo matrice dei contributi 
-                        launch_compute_contribution(                //da testare 
-                            world_value_d,world_id_d,signaling_d,
-                            contribution_d,workspace_output_d,alive_cells_d,
-                            world_dim, dim_output, i, idx_cell, streams[i]
-                        );
                         CUDA_CHECK(cudaGetLastError());
-                        printf("CALCOLO DEI CONTRIBUTI \n");
+                        printf("NN_forward \n");
 
                     }
                     cudaDeviceSynchronize();
                     CUDA_CHECK(cudaGetLastError());
 
                 }
+                void output_elaboration(
+                    float* mondo_signal,
+                    float* mondo_contributi,
+                    int* id_matrix
+                    int number_of_creatures,
+                    int dim_mondo,
+                    float* output,
+                    int output_size,
+                    int* cellule,
+                    int offset,
+                    int n_workspace
+                )
                 printf("CELL %2d & %2d END WORK \n",offset,offset+n_workspace);
                 offset+=n_workspace;
+
 
             }
                 

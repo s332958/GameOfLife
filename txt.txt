@@ -1,0 +1,4 @@
+launch_fill_random_kernel
+save_model_on_file
+launch_reset_kernel
+launch_add_objects_to_world
