@@ -1,6 +1,6 @@
 // =========================================================================================================
 
-__global__ void add_objects_to_world(float *world_value, int *world_id, int dim_world, 
+__global__ void add_objects_to_world_kernel(float *world_value, int *world_id, int dim_world, 
                                     int id, float min_value, float max_value, float threashold
                                 ){
     
@@ -29,131 +29,135 @@ __global__ void add_objects_to_world(float *world_value, int *world_id, int dim_
 
 // =========================================================================================================
 
-_global__ void world_update_kernel(float *mondo_creature, float *world, int *id_matrix, 
-                                int dim_world, int number_of_creatures, int *cellCount, Cellula *cellule_cu, int convolution_iter)
+__global__ void world_update_kernel(float *mondo_creature, float *world, int *id_matrix, 
+    int dim_world, int number_of_creatures, int *cellCount, int *cellule_cu, int convolution_iter)
     {                        
-    int center_x = blockIdx.x*blockDim.x + threadIdx.x;    
-    int center_y = blockIdx.y*blockDim.y + threadIdx.y;
-    int index = center_y * dim_world + center_x;
-    
-    if(index >= dim_world*dim_world) return;
-    
-    
-    int ID = id_matrix[index];
-    float starting_value = world[index];
-    
-    if(ID == -1) return;
-
-    float final_value = starting_value;
-    int final_id = ID;
-
-    int max_id = 0;
-    int max_value = 0;
-    float ally_energy = 0;
-    float enemy_energy = 0;
-    for(int i = 1; i <= number_of_creatures; i++){
-        int value = mondo_creature[i * dim_world * dim_world + index]; 
-        if (i == ID){
-            ally_energy = value;      
+        int center_x = blockIdx.x*blockDim.x + threadIdx.x;    
+        int center_y = blockIdx.y*blockDim.y + threadIdx.y;
+        int index = center_y * dim_world + center_x;
+        
+        if(index >= dim_world*dim_world) return;
+        
+        
+        int ID = id_matrix[index];
+        float starting_value = world[index];
+        
+        if(ID == -1) return;
+        
+        float final_value = starting_value;
+        int final_id = ID;
+        
+        int max_id = 0;
+        int max_value = 0;
+        float ally_energy = 0;
+        float enemy_energy = 0;
+        for(int i = 1; i <= number_of_creatures; i++){
+            int value = mondo_creature[i * dim_world * dim_world + index]; 
+            if (i == ID){
+                ally_energy = value;      
+            }    
+            else{
+                enemy_energy += value;
+            }                      
+            if (value > max_value){
+                max_value = value;
+                max_id = i;
+            }    
+        }    
+        if (ID == 0){
+            if (enemy_energy > 0){
+                final_value = starting_value * (max_value / enemy_energy) + max_value;
+                final_id = max_id;
+                
+                pos = atomicAdd(cellCount, 1);
+                cellule_cu[pos] = index;
+            }    
         }    
         else{
-            enemy_energy += value;
-        }                      
-        if (value > max_value){
-            max_value = value;
-            max_id = i;
+            if (starting_value + ally_energy - enemy_energy < 0){
+                final_value = abs(starting_value + ally_energy - enemy_energy);
+                final_id = 0;
+            }            
+            else{
+                final_value = starting_value + ally_energy - enemy_energy;
+            }    
         }    
-    }    
-    if (ID == 0){
-        if (enemy_energy > 0){
-            final_value = starting_value * (max_value / enemy_energy) + max_value;
-            final_id = max_id;
-
-            pos = atomicAdd(cellCount, 1);
-            Cellula newCell;
-            nuova.index = index;
-            nuova.ID = final_id;
-            nuova.alive = true;
-            nuova.dim_visione = 9; //dim_visione
-            nuova.center_x = index % dim_mondo;
-            nuova.center_y = index / dim_mondo;
-
-            cellule_cu[pos] = newCell;
+        
+        /*
+        final_value = fmaxf(0.0, fminf(255.0, final_value)); 
+        int index_save = convolution_iter*dim_world*dim_world + index;
+        world_save[index_save] = (unsigned char)final_value;
+        id_matrix_save[index_save] = (unsigned char)final_id;
+        */ 
+       if(final_value < 20.0f){
+           final_id = 0;
+        }     
+        
+        if(final_value > 255.0f){
+            final_value = 255.0f;
         }    
+        
+        world[index] = final_value;                   
+        id_matrix[index] = (int)final_id; 
     }    
-    else{
-        if (starting_value + ally_energy - enemy_energy < 0){
-            final_value = abs(starting_value + ally_energy - enemy_energy);
-            final_id = 0;
-        }            
-        else{
-            final_value = starting_value + ally_energy - enemy_energy;
-        }    
-    }    
-
-    /*
-    final_value = fmaxf(0.0, fminf(255.0, final_value)); 
-    int index_save = convolution_iter*dim_world*dim_world + index;
-    world_save[index_save] = (unsigned char)final_value;
-    id_matrix_save[index_save] = (unsigned char)final_id;
-    */ 
-   if(final_value < 20.0f){
-        final_id = 0;
-   }     
-
-   if(final_value > 255.0f){
-        final_value = 255.0f;
-    }    
-
-    world[index] = final_value;                   
-    id_matrix[index] = (int)final_id; 
-
-
-}    
-
-//==============================================================================================
-
-__global__ void cellule_cleanup_kernel(Cellula *cellule_cu, int *id_matrix, int* cellCount, int* mask_cu){
-    __shared__ int dim_paral = 10;
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
     
-    if(idx > cellCount) return;
+    //==============================================================================================
     
-    if(id_matrix[cellule_cu[idx].index] <= 0){
-       cellule_cu[idx].alive = false; 
-    }    
-
-    mask_cu[idx] = cellule_cu[idx].alive;
-    id_sort_x = idx % dim_paral;
-    id_sort_y = idx / dim_paral;
+__global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, int *id_matrix, int* cellCount, int* mask_cu, bool* mask_alive){
+        
+        int idx = threadIdx.x + blockIdx.x * blockDim.x;
+        
+        if(idx >= *cellCount) return;
     
-    if (id_sort_x == 0){
-        int increment = 0;
-        for (int i = 0; i < dim_paral; i++){
-            if(id_sort_y + i < cellCount){
-                increment = increment + mask_cu[id_sort_y*dim_paral + i];
-                mask_cu[id_sort_y*dim_paral + i] = increment;
-            }                
+        mask_cu[idx] = 0;
+        temp_cellule_cu[idx] = 0;
+        mask_alive[idx] = false;
+    
+        
+        if(id_matrix[cellule_cu[idx]] > 0){
+           mask_cu[idx] = 1; 
+           mask_alive[idx] = true;
         }    
-    }    
-    __syncthreads();
-
-    if (id_sort_y != 0){
-        mask_cu[id_sort_y*dim_paral + id_sort_x] = mask_cu[id_sort_y*dim_paral + id_sort_x] + mask_cu[id_sort_y*dim_paral - 1];
-    }    
-    __syncthreads();
-
-    if (cellule[idx].alive){
-        cellule[mask[idx] - 1] = cellule[idx];
-    }    
-
-    if (idx != 0) return;
-    cellCount = mask_cu[cellCount - 1];
-} 
-
-//================================================================================
-
-//Wrapper add objects to world
+        int dim_paral = 10;
+        int id_sort_x = idx % dim_paral;
+        int id_sort_y = idx / dim_paral;
+    
+        int index_sort = id_sort_y * dim_paral + id_sort_x;
+        
+        if (id_sort_x == 0){
+            int increment = 0;
+            for (int i = 0; i < dim_paral; i++){
+                
+                if(index_sort + i < *cellCount){ 
+                    increment = increment + mask_cu[index_sort + i];               
+                    mask_cu[index_sort + i] = increment;
+                }                
+            }    
+        }    
+        __syncthreads();
+    
+        if (id_sort_y != 0){
+            mask_cu[index_sort] = mask_cu[index_sort] + mask_cu[id_sort_y*dim_paral - 1];
+        }    
+        __syncthreads();
+    
+        if (mask_alive[idx] == true){
+            temp_cellule_cu[mask_cu[idx] - 1] = cellule_cu[idx];
+        }     
+        int new_cellCount = mask_cu[*cellCount - 1];
+        if (idx > new_cellCount)return;
+    
+        cellule_cu[idx] = temp_cellule_cu[idx];  
+    
+        if (idx != 0) return;
+        *cellCount = new_cellCount; 
+    
+        
+    } 
+    
+    //================================================================================
+    
+    //Wrapper add objects to world
 void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_world,
                                 int id, float min_value, float max_value, float threshold,
                                 cudaStream_t stream) {
@@ -161,7 +165,7 @@ void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_
     dim3 blockDim(16, 16);
     dim3 gridDim((dim_world + 15) / 16, (dim_world + 15) / 16);
 
-    add_objects_to_world<<<gridDim, blockDim, 0, stream>>>(
+    add_objects_to_world_kernel<<<gridDim, blockDim, 0, stream>>>(
         world_value_d, world_id_d, dim_world,
         id, min_value, max_value, threshold
     );
@@ -170,7 +174,7 @@ void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_
 
 //Wrapper mondo_cu update
 void launch_world_update(float *mondo_creature, float *world, int *id_matrix, int dim_world, int number_of_creatures,
-                                     int *cellCount, Cellula *cellule_cu, int convolution_iter);{
+                                     int *cellCount, int convolution_iter);{
 
 
     n_thread_per_block = properties.maxThreadsPerBlock;  
@@ -185,16 +189,20 @@ void launch_world_update(float *mondo_creature, float *world, int *id_matrix, in
 }
 
 //Wrapper cellule cleanup
-void launch_cellule_cleanup(Cellula *cellule_cu, int* cellCount, int* mask_cu){
-    cudaDeviceProp properties;
-    cudaGetDeviceProperties(&properties,0);
+void launch_cellule_cleanup(int* cellule_cu, int* cellCount, int* id_matrix, int* mask_cu){
+    int* temp_cellule_cu;
+    bool* mask_alive;    
+    
+    cudaMalloc((void**)&mask_alive, *cellCount * sizeof(bool));
+    cudaMalloc((void**)&temp_cellule_cu, *cellCount * sizeof(int));
 
-    int n_thread_per_block = properties.maxThreadsPerBlock;  
-    int thread_per_dimension = sqrt(n_thread_per_block);
-    int n_block = sqrt(cellCount) / thread_per_dimension;
-    if(n_block==0) n_block++;
-    dim3 block = dim3(n_block,n_block);
-    dim3 thread = dim3(thread_per_dimension,thread_per_dimension);
+    int n_thread_per_block = properties.maxThreadsPerBlock; 
+    int thread_number = *cellCount;
+    int n_block = thread_number / n_thread_per_block;
+    if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1; 
 
-    cellule_cleanup_kernel<<<block,thread>>>(cellule_cu, cellCount, mask_cu);
+    cellule_cleanup_kernel<<<n_block,n_thread_per_block>>>(cellule_cu, temp_cellule_cu, id_matrix, cellCount, mask_cu, mask_alive);
+
+    cudaFree(temp_cellule_cu);
+    cudaFree(mask_alive);
 }
