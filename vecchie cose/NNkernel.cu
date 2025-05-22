@@ -10,7 +10,7 @@ __device__ float fast_sigmoid(float x) {
 
 
 
-__global__ void kernel_NN_forward(
+__global__ void NN_forward_kernel(
     float* input,
     float* output, 
     float* weights, 
@@ -61,7 +61,7 @@ __global__ void kernel_NN_forward(
 }
 
 
-void NN_forward(
+void launch_NN_forward(
     float* input,
     float* output,
     float* weights,
@@ -84,22 +84,24 @@ void NN_forward(
     for(int i, i < (structureLenght-1), i++){
         layer1_size = structure[i];
         layer2_size = structure[i + 1];
+        weight_offset = //da aggiornare
+        bias_offset = //da aggiornare
 
         thread_number = layer1_size * layer2_size;        
         int n_block = thread_number / n_thread_per_block;
         if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1;      
 
         if(i == (structureLenght-1)){
-            kernel_NN_forward<<<n_block, n_thread_per_block>>>(input, output, &weights[weight_offset], &biases[bias_offset], cellule_index, cellule, matrice_id, n_weights, n_biases, layer1_size, layer2_size, layerInput_size, layerOutput_size);   
+            NN_forward_kernel<<<n_block, n_thread_per_block>>>(input, output, &weights[weight_offset], &biases[bias_offset], cellule_index, cellule, matrice_id, n_weights, n_biases, layer1_size, layer2_size, layerInput_size, layerOutput_size);   
         }
         else{
-            kernel_NN_forward<<<n_block, n_thread_per_block>>>(input, input, &weights[weight_offset], &biases[bias_offset], cellule_index, cellule, matrice_id, n_weights, n_biases, layer1_size, layer2_size, layerInput_size, layerOutput_size);    
+            NN_forward_kernel<<<n_block, n_thread_per_block>>>(input, input, &weights[weight_offset], &biases[bias_offset], cellule_index, cellule, matrice_id, n_weights, n_biases, layer1_size, layer2_size, layerInput_size, layerOutput_size);    
         }
     }
 
 }
 
-__global__ void kernel_output_elaboration(
+__global__ void output_elaboration_kernel(
     float* mondo,
     float* mondo_signal,
     float* mondo_contributi,
@@ -144,19 +146,18 @@ __global__ void kernel_output_elaboration(
     
     int filter_index = dim_mondo * dim_mondo * (ID - 1) + filter_y * dim_mondo + filter_x;
 
-    int frazione_di_se_stesso = 0.08
+    float frazione_di_se_stesso = 0.05;
 
     float final_output = center_value * frazione_di_se_stesso * output;
 
     mondo_contributi[filter_index] = final_output;
 
-    atomicAdd(&mondo[center_index], - final_output);
-    
+    atomicAdd(&mondo[center_index], - final_output);    
 }
 
 
 
-void output_elaboration(
+void launch_output_elaboration(
     float* mondo_signal,
     float* mondo_contributi,
     int* id_matrix
@@ -169,9 +170,9 @@ void output_elaboration(
     int num_work
 ){
     int n_thread_per_block = properties.maxThreadsPerBlock;
-    thread_number = output_size * numCellule;
+    thread_number = output_size * num_work;
     int n_block = thread_number / n_thread_per_block;
     if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1; 
 
-    kernel_output_elaboration<<<n_block, n_thread_per_block>>>(mondo_signal, mondo_contributi, id_matrix, number_of_creatures, dim_mondo, output, output_size, cellule, offset, num_work);
+    output_elaboration_kernel<<<n_block, n_thread_per_block>>>(mondo_signal, mondo_contributi, id_matrix, number_of_creatures, dim_mondo, output, output_size, cellule, offset, num_work);
 }

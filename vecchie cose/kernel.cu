@@ -342,3 +342,57 @@ extern "C" void wrap_zero_mondocreature(float* mondo_creature, int* dim_world){
     
 
 }    
+
+
+__global__ void cellule_cleanup(Cellula *cellule_cu, int *id_matrix, int* cellCount, int* mask_cu){
+    __shared__ int dim_paral = 10;
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    
+    if(idx > cellCount) return;
+    
+    if(id_matrix[cellule_cu[idx].index] <= 0){
+       cellule_cu[idx].alive = false; 
+    }    
+
+    mask_cu[idx] = cellule_cu[idx].alive;
+    id_sort_x = idx % dim_paral;
+    id_sort_y = idx / dim_paral;
+    
+    if (id_sort_x == 0){
+        int increment = 0;
+        for (int i = 0; i < dim_paral; i++){
+            if(id_sort_y + i < cellCount){
+                increment = increment + mask_cu[id_sort_y*dim_paral + i];
+                mask_cu[id_sort_y*dim_paral + i] = increment;
+            }                
+        }    
+    }    
+    __syncthreads();
+
+    if (id_sort_y != 0){
+        mask_cu[id_sort_y*dim_paral + id_sort_x] = mask_cu[id_sort_y*dim_paral + id_sort_x] + mask_cu[id_sort_y*dim_paral - 1];
+    }    
+    __syncthreads();
+
+    if (cellule[idx].alive){
+        cellule[mask[idx] - 1] = cellule[idx];
+    }    
+
+    if (idx != 0) return;
+    cellCount = mask_cu[cellCount - 1];
+} 
+
+extern "C" int wrap_cellule_cleanup(Cellula *cellule_cu, int* cellCount, int* mask_cu){
+    cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties,0);
+
+    int n_thread_per_block = properties.maxThreadsPerBlock;  
+    int thread_per_dimension = sqrt(n_thread_per_block);
+    int n_block = sqrt(cellCount) / thread_per_dimension;
+    if(n_block==0) n_block++;
+    dim3 block = dim3(n_block,n_block);
+    dim3 thread = dim3(thread_per_dimension,thread_per_dimension);
+
+    add_base_food<<<block,thread>>>(cellule_cu, cellCount, mask_cu);
+
+}

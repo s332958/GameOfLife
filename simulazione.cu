@@ -192,11 +192,11 @@ void simulazione(
 
     
 
-        /*
+        
         // - Aggiunta ostacoli al mondo
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, streams[0]);
         CUDA_CHECK(cudaGetLastError());
-        */
+        /**/
 
 
         // - Aggiunta cibo al mondo
@@ -205,11 +205,13 @@ void simulazione(
 
         printf("ADD ELEMENTS TO WORLD\n");
             
+        /*
         // - Calcolo cellule vive
         launch_find_index_cell_alive(world_id_d,world_dim*world_dim,alive_cells_d,n_cell_alive_d,n_cell_alive_h,support_vector_d,streams[0]);
         CUDA_CHECK(cudaGetLastError());
-
+        
         printf("COMPUTE ALIVE CELLS %d\n",*n_cell_alive_h);
+        */
 
         // - Ritorno mondo valori
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size, cudaMemcpyDeviceToHost, cc_major, streams[0]);
@@ -228,9 +230,12 @@ void simulazione(
             // -------------------------------------------
             // FASE 2 : calcolo step 
             // -------------------------------------------
-                
             int offset=0;
             int vision = sqrt(dim_input/3);
+
+            launch_reset_kernel<float>(contribution_d, world_dim * world_dim * n_creature, streams[0]);
+            CUDA_CHECK(cudaGetLastError());
+
             while(offset<*n_cell_alive_h){
 
                 for(int i=0; i<n_workspace; i++){
@@ -253,7 +258,7 @@ void simulazione(
                             int cellule_index,
                             int *cellule,
                             int* matrice_id    
-                        )
+                        );
 
                         CUDA_CHECK(cudaGetLastError());
                         printf("NN_forward \n");
@@ -282,12 +287,17 @@ void simulazione(
             }
                 
             // - Aggiornamento matrice valori ed id
+            wrap_mondo_cu_update();
 
+            wrap_cellule_cleanup();
+
+            /*
             // - Aggiornamento numero cellule vive
             launch_find_index_cell_alive(world_id_d,world_dim*world_dim,alive_cells_d,n_cell_alive_d,n_cell_alive_h,support_vector_d,streams[0]);
             CUDA_CHECK(cudaGetLastError());
-
+            
             printf("COMPUTE ALIVE CELLS %d\n",*n_cell_alive_h);
+            */
 
 
             // - Aggiornamento vettori valutazione occupazione ed energia
@@ -297,7 +307,7 @@ void simulazione(
             printf("UPDATE EVALUATION VECTORS \n");
 
             // - Reset matrice dei contributi
-            launch_reset_kernel<float>(contribution_d, world_dim * world_dim * n_creature, streams[0]);
+            
             CUDA_CHECK(cudaGetLastError());
             printf("RESET CONTRIBUTION MATRIX \n");
 

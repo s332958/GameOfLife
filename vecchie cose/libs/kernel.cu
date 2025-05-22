@@ -275,7 +275,7 @@ __global__ void compact_cell_alive_kernel_pt1(int *alive_cell_vector, int *suppo
 
 }
 
-*/
+
 
 __global__ void compact_cell_alive_kernel_pt1(
     int *alive_cell_vector,
@@ -355,10 +355,9 @@ __global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *suppo
 
 
 }
+*/
 
 // ============================================================================
-
-
 
 __global__ void vision_kernel(
     float* world_value,
@@ -391,8 +390,6 @@ __global__ void vision_kernel(
     input[workspace_offset + offset + 1] = static_cast<float>(world_id[world_pos]);
     input[workspace_offset + offset + 2] = world_signaling[world_pos];
 }
-
-
 
 // ============================================================================
 
