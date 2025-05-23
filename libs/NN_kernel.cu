@@ -1,3 +1,6 @@
+#include <cuda_runtime.h>
+#include <curand_kernel.h>
+
 __device__ float relu(float x) {
     return x > 0.0f ? x : 0.0f;
 }
@@ -105,7 +108,7 @@ __global__ void output_elaboration_kernel(
     int* id_matrix,
     int number_of_creatures,
     int dim_mondo,
-    float* output,    
+    float* outputs,    
     int output_size,
     int* cellule,
     int offset,
@@ -115,7 +118,7 @@ __global__ void output_elaboration_kernel(
 
     if(index > output_size * num_work)return;
 
-    float output = output[index];
+    float output = outputs[index];
 
     output = sigmoid(output);
     
@@ -279,7 +282,7 @@ void launch_NN_forward(
     int *cellule,
     int* matrice_id    
 ){
-    int n_thread_per_block = properties.maxThreadsPerBlock;
+    int n_thread_per_block = 1024;
     int layer1_size = 0;
     int layer2_size = 0;
     int structureLenght = sizeof(structure) / sizeof(structure[0]);
@@ -287,13 +290,13 @@ void launch_NN_forward(
     int layerOutput_size = structure[structureLenght];
     int weight_offset = 0;
     int bias_offset = 0;
-    for(int i, i < (structureLenght-1), i++){
+    for(int i=0; i < (structureLenght-1); i++){
         layer1_size = structure[i];
         layer2_size = structure[i + 1];
-        weight_offset = //da aggiornare
-        bias_offset = //da aggiornare
+        weight_offset = 0;//da aggiornare
+        bias_offset = 0;//da aggiornare
 
-        thread_number = layer1_size * layer2_size;        
+        int thread_number = layer1_size * layer2_size;        
         int n_block = thread_number / n_thread_per_block;
         if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1;      
 
@@ -309,23 +312,36 @@ void launch_NN_forward(
 
 //Wrapper kernel output_elaboration
 void launch_output_elaboration(
-    float* mondo_signal,
-    float* mondo_contributi,
+    float* world_value,
+    float* world_signal,
+    float* contribution_matrix,
     int* id_matrix,
     int number_of_creatures,
-    int dim_mondo,
+    int world_dim,
     float* output,
     int output_size,
-    int* cellule,
+    int* cells,
     int offset,
-    int num_work
+    int num_work,
+    cudaStream_t stream
 ){
-    int n_thread_per_block = properties.maxThreadsPerBlock;
-    thread_number = output_size * num_work;
+    int n_thread_per_block = 1024;
+    int thread_number = output_size * num_work;
     int n_block = thread_number / n_thread_per_block;
     if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1; 
 
-    output_elaboration_kernel<<<n_block, n_thread_per_block>>>(mondo_signal, mondo_contributi, id_matrix, number_of_creatures, dim_mondo, output, output_size, cellule, offset, num_work);
+    output_elaboration_kernel<<<n_block, n_thread_per_block, 0, stream>>>(
+        world_value,
+        world_signal,
+        contribution_matrix,
+        id_matrix, 
+        number_of_creatures, 
+        world_dim, 
+        output,
+        output_size, 
+        cells, 
+        offset, 
+        num_work);
 }
 
 // ===================================================================================================
