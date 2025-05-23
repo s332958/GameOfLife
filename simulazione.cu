@@ -98,10 +98,10 @@ void simulazione(
     }
 
     // Allocazioni GPU con stream diversi
+    
+    float *world_RGB           = (float*) cuda_allocate(tot_world_dim_size*3, cc_major, streams[0]);
     float *world_value_d       = (float*) cuda_allocate(tot_world_dim_size, cc_major, streams[0]);
-    int   *world_id_d          = (int*)   cuda_allocate(tot_world_dim_size, cc_major, streams[0]);
-    float *contribution_d      = (float*) cuda_allocate(tot_matrix_contribution_size, cc_major, streams[0]);
-    float *signaling_d         = (float*) cuda_allocate(tot_matrix_contribution_size, cc_major, streams[0]);
+    int   *world_id_d          = (int*) cuda_allocate(tot_matrix_contribution_size, cc_major, streams[0]);
     float *model_weights_d     = (float*) cuda_allocate(tot_models_weight_size, cc_major, streams[0]);
     float *model_biases_d      = (float*) cuda_allocate(tot_models_bias_size, cc_major, streams[0]);
     int   *alive_cells_d       = (int*)   cuda_allocate(tot_world_dim_size, cc_major, streams[0]);
@@ -312,6 +312,8 @@ void simulazione(
 
             CUDA_CHECK(cudaGetLastError());
 
+
+
             launch_cellule_cleanup(alive_cells_d, 
                                     n_cell_alive_h, 
                                     world_id_d);
@@ -325,19 +327,51 @@ void simulazione(
             launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature,streams[0]);
             CUDA_CHECK(cudaGetLastError());
 
+            wrap_mappaColori(mondo, id_matrix, mondo_rgb, dim_mondo, dim_mondo);
             printf("UPDATE EVALUATION VECTORS \n");
 
             // - Reset matrice dei contributi
             
             CUDA_CHECK(cudaGetLastError());
             printf("RESET CONTRIBUTION MATRIX \n");
-
             // - Ritorno mondo valori
             cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size, cudaMemcpyDeviceToHost, cc_major, streams[0]);
             CUDA_CHECK(cudaGetLastError());
             // - Ritorno mondo id 
             cuda_memcpy(world_id_h, world_id_d, tot_world_dim_size, cudaMemcpyDeviceToHost, cc_major, streams[0]);
             CUDA_CHECK(cudaGetLastError());
+
+            if(render){
+                if (glfwWindowShouldClose(window)) {
+                    std::cout << "Finestra chiusa. Terminazione del programma." << std::endl;
+                    break; // Esce dal ciclo
+                }
+            }
+
+            
+
+            if(render){
+                // Carica i dati nella texture OpenGL
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, dim_mondo, dim_mondo, 0, GL_RGB, GL_FLOAT, mondo_rgb);
+
+                // Pulizia del buffer di colore
+                glClear(GL_COLOR_BUFFER_BIT);
+
+                // Renderizzazione della texture su un quad
+                glBegin(GL_QUADS);
+                glTexCoord2f(0.0f, 0.0f); glVertex2f(-1.0f, -1.0f);
+                glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0f, -1.0f);
+                glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0f, 1.0f);
+                glTexCoord2f(0.0f, 1.0f); glVertex2f(-1.0f, 1.0f);
+                glEnd();
+
+                // Swap dei buffer
+                glfwSwapBuffers(window);
+
+                // Gestione degli eventi
+                glfwPollEvents();
+            }
+
 
             save_map(file,world_dim,world_value_h,world_id_h);
 

@@ -293,8 +293,6 @@ void launch_NN_forward(
     for(int i=0; i < (structureLenght-1); i++){
         layer1_size = structure[i];
         layer2_size = structure[i + 1];
-        weight_offset = 0;//da aggiornare
-        bias_offset = 0;//da aggiornare
 
         int thread_number = layer1_size * layer2_size;        
         int n_block = thread_number / n_thread_per_block;
@@ -306,6 +304,9 @@ void launch_NN_forward(
         else{
             NN_forward_kernel<<<n_block, n_thread_per_block>>>(input, input, &weights[weight_offset], &biases[bias_offset], cellule_index, cellule, matrice_id, n_weights, n_biases, layer1_size, layer2_size, layerInput_size, layerOutput_size);    
         }
+        weight_offset += layer1_size * layer2_size;
+        bias_offset += layer2_size;
+
     }
 
 }
