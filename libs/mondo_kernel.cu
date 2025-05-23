@@ -32,8 +32,16 @@ __global__ void add_objects_to_world_kernel(float *world_value, int *world_id, i
 
 // =========================================================================================================
 
-__global__ void world_update_kernel(float *mondo_creature, float *world, int *id_matrix, 
-    int dim_world, int number_of_creatures, int *cellCount, int *cellule_cu, int convolution_iter)
+__global__ void world_update_kernel(
+    float *world_value, 
+    int *id_matrix, 
+    float *contribution_matrix,
+    int dim_world, 
+    int number_of_creatures, 
+    int *cellCount, 
+    int *cells, 
+    int convolution_iter
+)
     {                        
         int center_x = blockIdx.x*blockDim.x + threadIdx.x;    
         int center_y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -43,7 +51,7 @@ __global__ void world_update_kernel(float *mondo_creature, float *world, int *id
         
         
         int ID = id_matrix[index];
-        float starting_value = world[index];
+        float starting_value = world_value[index];
         
         if(ID == -1) return;
         
@@ -54,9 +62,9 @@ __global__ void world_update_kernel(float *mondo_creature, float *world, int *id
         int max_value = 0;
         float ally_energy = 0;
         float enemy_energy = 0;
-        for(int i = 1; i <= number_of_creatures; i++){
-            int value = mondo_creature[i * dim_world * dim_world + index]; 
-            if (i == ID){
+        for(int i = 0; i < number_of_creatures; i++){
+            int value = contribution_matrix[i * dim_world * dim_world + index]; 
+            if (i+1 == ID){
                 ally_energy = value;      
             }    
             else{
@@ -64,7 +72,7 @@ __global__ void world_update_kernel(float *mondo_creature, float *world, int *id
             }                      
             if (value > max_value){
                 max_value = value;
-                max_id = i;
+                max_id = i+1;
             }    
         }    
         if (ID == 0){
@@ -72,8 +80,8 @@ __global__ void world_update_kernel(float *mondo_creature, float *world, int *id
                 final_value = starting_value * (max_value / enemy_energy) + max_value;
                 final_id = max_id;
                 
-                pos = atomicAdd(cellCount, 1);
-                cellule_cu[pos] = index;
+                int pos = atomicAdd(cellCount, 1);
+                cells[pos] = index;
             }    
         }    
         else{
@@ -86,15 +94,15 @@ __global__ void world_update_kernel(float *mondo_creature, float *world, int *id
             }    
         }    
         
-        if(final_value < 20.0f){
+        if(final_value < 0.2f){
            final_id = 0;
         }     
         
-        if(final_value > 255.0f){
-            final_value = 255.0f;
+        if(final_value > 1.0f){
+            final_value = 1.0f;
         }    
         
-        world[index] = final_value;                   
+        world_value[index] = final_value;                   
         id_matrix[index] = (int)final_id; 
     }    
     
@@ -171,34 +179,34 @@ void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_
 
 //Wrapper mondo_cu update
 void launch_world_update(float *mondo_creature, float *world, int *id_matrix, int dim_world, int number_of_creatures,
-                                     int *cellCount, int convolution_iter);{
+                            int *cellCount, int convolution_iter, cudaStream_t stream){
 
 
-    n_thread_per_block = properties.maxThreadsPerBlock;  
+    int n_thread_per_block = 1024;  
     int thread_per_dimension = sqrt(n_thread_per_block);
-    n_block = dim_world / thread_per_dimension;
+    int n_block = dim_world / thread_per_dimension;
     if(n_block==0) n_block = 1;
-    thread_number = dim3(thread_per_dimension, thread_per_dimension);  
-    block_number = dim3(n_block, n_block); 
+    dim3 thread_number = dim3(thread_per_dimension, thread_per_dimension);  
+    dim3 block_number = dim3(n_block, n_block); 
 
     world_update_kernel<<<block_number,thread_number,0,stream>>>(mondo_creature, world,id_matrix,filter,world_save,id_matrix_save,dim_world,number_of_creatures,convolution_iter);
 
 }
 
 //Wrapper cellule cleanup
-void launch_cellule_cleanup(int* cellule_cu, int* cellCount, int* id_matrix, int* mask_cu){
+void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, int* mask_cu, cudaStream_t stream){
     int* temp_cellule_cu;
     bool* mask_alive;    
     
     cudaMalloc((void**)&mask_alive, *cellCount * sizeof(bool));
     cudaMalloc((void**)&temp_cellule_cu, *cellCount * sizeof(int));
 
-    int n_thread_per_block = properties.maxThreadsPerBlock; 
+    int n_thread_per_block = 1024; //properties.maxThreadsPerBlock; 
     int thread_number = *cellCount;
     int n_block = thread_number / n_thread_per_block;
     if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1; 
 
-    cellule_cleanup_kernel<<<n_block,n_thread_per_block>>>(cellule_cu, temp_cellule_cu, id_matrix, cellCount, mask_cu, mask_alive);
+    cellule_cleanup_kernel<<<n_block, n_thread_per_block, 0, stream>>>(cells, temp_cellule_cu, id_matrix, cellCount, mask_cu, mask_alive);
 
     cudaFree(temp_cellule_cu);
     cudaFree(mask_alive);
