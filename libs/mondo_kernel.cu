@@ -196,9 +196,11 @@ void launch_world_update(float *mondo_creature, float *world, int *id_matrix, in
 //Wrapper cellule cleanup
 void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, int* mask_cu, cudaStream_t stream){
     int* temp_cellule_cu;
+    int* mask_cu;
     bool* mask_alive;    
     
     cudaMalloc((void**)&mask_alive, *cellCount * sizeof(bool));
+    cudaMalloc((void**)&mask_cu, *cellCount * sizeof(int));
     cudaMalloc((void**)&temp_cellule_cu, *cellCount * sizeof(int));
 
     int n_thread_per_block = 1024; //properties.maxThreadsPerBlock; 
@@ -210,4 +212,5 @@ void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, int* mas
 
     cudaFree(temp_cellule_cu);
     cudaFree(mask_alive);
+    cudaFree(mask_cu);
 }
