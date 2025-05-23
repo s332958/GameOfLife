@@ -1,5 +1,11 @@
-#include "libs/kernel.cu"
-#include "libs/utils.cuh"
+#include "libs/mondo_kernel.cu"
+#include "libs/NN_kernel.cu"
+#include "libs/utils_kernel.cu"
+#include "libs/utils_cpu.cu"
+
+#include <stdio.h>
+#include <iostream>
+#include <cuda_runtime.h>
 
 
 void simulazione(
@@ -72,7 +78,7 @@ void simulazione(
     else model_biases_h        = biases_models;
 
     // Creazione Mondo con creature ------------------------------------------------------Cambiato
-    for (int = 0, i < n_creature, i++){
+    for (int i = 0; i < n_creature; i++){
         int random_index = rand() % world_dim*world_dim;
         world_value_h[random_index] = 1;
         world_id_h[random_index] = i + 1;
@@ -271,7 +277,7 @@ void simulazione(
                 void output_elaboration(
                     float* mondo_signal,
                     float* mondo_contributi,
-                    int* id_matrix
+                    int* id_matrix,
                     int number_of_creatures,
                     int dim_mondo,
                     float* output,
@@ -279,7 +285,7 @@ void simulazione(
                     int* cellule,
                     int offset,
                     int n_workspace
-                )
+                );
                 printf("CELL %2d & %2d END WORK \n",offset,offset+n_workspace);
                 offset+=n_workspace;
 
@@ -287,9 +293,9 @@ void simulazione(
             }
                 
             // - Aggiornamento matrice valori ed id
-            wrap_mondo_cu_update();
+            //wrap_mondo_cu_update();
 
-            wrap_cellule_cleanup();
+            //wrap_cellule_cleanup();
 
             /*
             // - Aggiornamento numero cellule vive

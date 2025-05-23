@@ -1,3 +1,6 @@
+#include <cuda_runtime.h>
+#include <curand_kernel.h>
+
 // =========================================================================================================
 
 __global__ void add_objects_to_world_kernel(float *world_value, int *world_id, int dim_world, 
@@ -83,13 +86,7 @@ __global__ void world_update_kernel(float *mondo_creature, float *world, int *id
             }    
         }    
         
-        /*
-        final_value = fmaxf(0.0, fminf(255.0, final_value)); 
-        int index_save = convolution_iter*dim_world*dim_world + index;
-        world_save[index_save] = (unsigned char)final_value;
-        id_matrix_save[index_save] = (unsigned char)final_id;
-        */ 
-       if(final_value < 20.0f){
+        if(final_value < 20.0f){
            final_id = 0;
         }     
         

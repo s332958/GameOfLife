@@ -222,8 +222,6 @@ __global__ void find_index_cell_alive_kernel(
     }
 }
 
-/*
-
 __global__ void compact_cell_alive_kernel_pt1(int *alive_cell_vector, int *support_vector, int *n_alive_cell, int world_dim){
     extern __shared__ int shared_mem[]; 
     // dim n_thread*2+1  
@@ -355,7 +353,6 @@ __global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *suppo
 
 
 }
-*/
 
 // ============================================================================
 

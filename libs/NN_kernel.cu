@@ -57,7 +57,7 @@ __global__ void NN_forward_kernel(
     int n_biases, 
     int layer1_size, 
     int layer2_size,
-    int layerInput_size
+    int layerInput_size,
     int layerOutput_size){
         int index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -152,6 +152,96 @@ __global__ void output_elaboration_kernel(
     atomicAdd(&mondo[center_index], - final_output);    
 }
 
+// ===================================================================================
+
+__global__ void compute_energy_and_occupation_kernel(
+    float* world_value,
+    int* world_id,
+    int* occupation_vector,
+    float* energy_vector,
+    int world_dim,
+    int n_creature) {
+
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (x >= world_dim || y >= world_dim) return;
+
+    int idx = x + y*world_dim;
+    
+    // index on vectors valuation
+    int id = world_id[idx] -1;
+
+    if (id >= 0 && id < n_creature) {
+        // Accesso atomico per evitare race condition
+        atomicAdd(&occupation_vector[id], 1);
+        atomicAdd(&energy_vector[id], world_value[idx]);
+    }
+
+}
+
+// ==================================================================================
+
+__global__ void recombine_models_kernel(
+    float *weights, float *biases,
+    float *new_weights, float *new_biases,
+    int num_weights_per_model, int num_bias_per_model,
+    int model1_idx, int model2_idx, int output_idx,
+    float mutation_prob,
+    float mutation_range,
+    unsigned long seed)
+{
+    __shared__ int gen_id;
+
+    // Calcolo indice thread
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int total_genes = num_weights_per_model + num_bias_per_model;
+    if (idx >= total_genes) return;
+
+    curandState state;
+    curand_init(seed, idx, 0, &state);
+
+    if(threadIdx.x==0){
+        int gen = curand(&state) % 2;
+        gen_id = gen==0?model1_idx:model2_idx;
+    }
+
+    __syncthreads();
+
+    int idx_model_param_gen = -1;
+
+    if (idx < num_weights_per_model) {
+
+        idx_model_param_gen = (gen_id * num_weights_per_model) + idx;
+
+        float gene_value = weights[idx_model_param_gen];
+
+        if (curand_uniform(&state) > mutation_prob) {
+            float delta = (curand_uniform(&state) * 2.0f - 1.0f) * mutation_range;
+            gene_value += delta;
+        }
+
+        int idx_model_param_out = (output_idx * num_weights_per_model + idx);
+        new_weights[idx_model_param_out] = gene_value;
+
+    }else{
+
+        idx_model_param_gen = (gen_id * num_bias_per_model) + idx - num_weights_per_model;
+
+        float gene_value = biases[idx_model_param_gen];
+
+        if (curand_uniform(&state) < mutation_prob) {
+            float delta = (curand_uniform(&state) * 2.0f - 1.0f) * mutation_range;
+            gene_value += delta;
+        }
+
+        int idx_model_param_out = (output_idx * num_bias_per_model) + idx - num_weights_per_model;
+        new_biases[idx_model_param_out] = gene_value;
+
+    }
+
+}
+
 //=================================================================================
 
 // Wrapper kernel visione
@@ -236,4 +326,73 @@ void launch_output_elaboration(
     if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1; 
 
     output_elaboration_kernel<<<n_block, n_thread_per_block>>>(mondo_signal, mondo_contributi, id_matrix, number_of_creatures, dim_mondo, output, output_size, cellule, offset, num_work);
+}
+
+// ===================================================================================================
+
+// Wrapper compute energy and occupation for evaluation
+void launch_compute_energy_and_occupation(
+    float* world_value,
+    int* world_id,
+    int* occupation_vector,
+    float* energy_vector,
+    int world_dim,
+    int n_creature,
+    cudaStream_t stream
+){
+
+    int n_thread = 32;
+    int n_block = (world_dim + n_thread -1) / n_thread;
+    dim3 dim_block(n_thread,n_thread);
+    dim3 dim_grid(n_block,n_block);
+
+    compute_energy_and_occupation_kernel<<<dim_grid,dim_block,0,stream>>>(
+        world_value,
+        world_id,
+        occupation_vector,
+        energy_vector,
+        world_dim,
+        n_creature);
+
+
+}
+
+// ==================================================================================================
+
+// Wrapper: recombine_model
+void launch_recombine_models_kernel(
+    float *d_weights, float *d_biases,
+    float *d_new_weights, float *d_new_biases,
+    int num_weights_per_model, int num_bias_per_model,
+    int model1_idx, int model2_idx, int output_idx,
+    float gen_x_block,
+    float mutation_prob,
+    float mutation_range,
+    unsigned long seed,
+    cudaStream_t stream) 
+{
+    // Numero totale di geni (pesi + bias)
+    int total_genes = num_weights_per_model + num_bias_per_model;
+
+    // Imposta configurazione kernel
+    int threads_per_block = gen_x_block*total_genes +1;
+    if(threads_per_block>1024) threads_per_block = 1024;
+    int num_blocks = (total_genes + threads_per_block - 1) / threads_per_block;
+
+    // Lancia il kernel
+    recombine_models_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
+        d_weights,
+        d_biases,
+        d_new_weights,
+        d_new_biases,
+        num_weights_per_model,
+        num_bias_per_model,
+        model1_idx,
+        model2_idx,
+        output_idx,
+        mutation_prob,
+        mutation_range,
+        seed
+    );
+
 }
