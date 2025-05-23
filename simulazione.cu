@@ -18,7 +18,11 @@ void simulazione(
 
     FILE *file = fopen("output.txt","w");
     fprintf(file,"%d\n",world_dim);
-    
+
+    int input_size = dims_model[0];
+    int output_size = dims_model[n_layer-1];
+
+
     // -------------------------------------------
     // PRE-FASE : Info GPU
     // -------------------------------------------
@@ -69,6 +73,7 @@ void simulazione(
     int   *occupation_vector_h = (int*)   malloc(tot_eval_vector_size);
     int   *creature_ordered_h  = (int*)   malloc(tot_eval_vector_size);
     int   *n_cell_alive_h      = (int*)   malloc(sizeof(int));
+    cudaMallocManaged(&n_cell_alive_h, sizeof(int));
     float *model_weights_h     = nullptr;
     float *model_biases_h      = nullptr;
 
@@ -107,7 +112,10 @@ void simulazione(
     float *new_model_biases_d  = (float*) cuda_allocate(tot_models_bias_size, cc_major, streams[0]);
     int   *n_cell_alive_d      = (int*)   cuda_allocate(sizeof(int), cc_major, streams[0]);
     int   *support_vector_d    = (int*)   cuda_allocate(tot_support_vector_size, cc_major, streams[0]); // zona di memoria allocata per operazioni di supporto
-    
+    int   *NN_structure_d      = (int*)   cuda_allocate(n_layer * sizeof(int), cc_major, streams[0]);
+
+    cuda_memcpy(NN_structure_d, dims_model, n_layer * sizeof(int), cudaMemcpyHostToDevice, cc_major, streams[0]);
+    CUDA_CHECK(cudaGetLastError());
     //cudaDeviceSynchronize();
 
     // Calcolo spazio massimo disponibile per workspace
@@ -253,17 +261,17 @@ void simulazione(
                         CUDA_CHECK(cudaGetLastError());
                         printf("LANCIO KERNEL VISION \n");
 
-                        void NN_forward(
-                            float* input,
-                            float* output,
-                            float* weights,
-                            int n_weights,
-                            float* biases,
-                            int n_biases,
-                            int* structure,
-                            int cellule_index,
-                            int *cellule,
-                            int* matrice_id    
+                        NN_forward(
+                            workspace_input_d,
+                            workspace_output_d,
+                            model_weights_d,
+                            n_weights,
+                            model_biases_d,
+                            n_biases,
+                            NN_structure_d,
+                            idx_cell,
+                            alive_cells_d,
+                            world_id_d    
                         );
 
                         CUDA_CHECK(cudaGetLastError());
@@ -271,40 +279,47 @@ void simulazione(
 
                     }
                     cudaDeviceSynchronize();
-                    CUDA_CHECK(cudaGetLastError());
+                    
 
                 }
-                void output_elaboration(
-                    float* mondo_signal,
-                    float* mondo_contributi,
-                    int* id_matrix,
-                    int number_of_creatures,
-                    int dim_mondo,
-                    float* output,
-                    int output_size,
-                    int* cellule,
-                    int offset,
-                    int n_workspace
+                output_elaboration(
+                    signaling_d,
+                    contribution_d,
+                    world_id_d,
+                    n_creature,
+                    world_dim,
+                    workspace_output_d,
+                    output_size,
+                    alive_cells_d,
+                    offset,
+                    n_workspace
                 );
+                CUDA_CHECK(cudaGetLastError());
                 printf("CELL %2d & %2d END WORK \n",offset,offset+n_workspace);
                 offset+=n_workspace;
 
 
             }
                 
-            // - Aggiornamento matrice valori ed id
-            //wrap_mondo_cu_update();
+            launch_world_update(contribution_d,
+                                world_value_d,
+                                world_id_d,
+                                world_dim,
+                                n_creature,
+                                n_cell_alive_h, 
+                                step);
+                                    
 
-            //wrap_cellule_cleanup();
-
-            /*
-            // - Aggiornamento numero cellule vive
-            launch_find_index_cell_alive(world_id_d,world_dim*world_dim,alive_cells_d,n_cell_alive_d,n_cell_alive_h,support_vector_d,streams[0]);
             CUDA_CHECK(cudaGetLastError());
-            
-            printf("COMPUTE ALIVE CELLS %d\n",*n_cell_alive_h);
-            */
 
+            launch_cellule_cleanup(alive_cells_d, 
+                                    n_cell_alive_h, 
+                                    world_id_d);
+
+            CUDA_CHECK(cudaGetLastError());
+
+            
+           
 
             // - Aggiornamento vettori valutazione occupazione ed energia
             launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature,streams[0]);
