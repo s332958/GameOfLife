@@ -39,8 +39,7 @@ __global__ void world_update_kernel(
     int dim_world, 
     int number_of_creatures, 
     int *cellCount, 
-    int *cells, 
-    int convolution_iter
+    int *cells
 )
     {                        
         int center_x = blockIdx.x*blockDim.x + threadIdx.x;    
@@ -178,18 +177,34 @@ void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_
 }
 
 //Wrapper mondo_cu update
-void launch_world_update(float *mondo_creature, float *world, int *id_matrix, int dim_world, int number_of_creatures,
-                            int *cellCount, int convolution_iter, cudaStream_t stream){
+void launch_world_update(
+    float *world_value,
+    int *id_matrix,
+    float *contribution_matrix, 
+    int *cells,
+    int world_dim, 
+    int number_of_creatures,
+    int *cellCount, 
+    cudaStream_t stream
+){
 
 
     int n_thread_per_block = 1024;  
     int thread_per_dimension = sqrt(n_thread_per_block);
-    int n_block = dim_world / thread_per_dimension;
+    int n_block = world_dim / thread_per_dimension;
     if(n_block==0) n_block = 1;
     dim3 thread_number = dim3(thread_per_dimension, thread_per_dimension);  
     dim3 block_number = dim3(n_block, n_block); 
 
-    world_update_kernel<<<block_number,thread_number,0,stream>>>(mondo_creature, world,id_matrix,filter,world_save,id_matrix_save,dim_world,number_of_creatures,convolution_iter);
+    world_update_kernel<<<block_number,thread_number,0,stream>>>(
+        world_value, 
+        id_matrix,
+        contribution_matrix,
+        world_dim,
+        number_of_creatures,
+        cellCount,
+        cells
+    );
 
 }
 
