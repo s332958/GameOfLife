@@ -30,8 +30,8 @@ void launch_mappa_colori(float* mondo, int* id_matrix, float* mondo_rgb_d, int w
 
     int n_thread_per_block = 1024; //properties.maxThreadsPerBlock; 
     int thread_number = world_dim*world_dim*3;
-    int n_block = thread_number / n_thread_per_block;
-    if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1; 
+    int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
+
 
     mappa_colori_kernel<<<n_block, n_thread_per_block, 0, stream>>>(mondo, id_matrix, mondo_rgb_d, thread_number);
 
