@@ -54,7 +54,7 @@ __global__ void world_update_kernel(
         int index = center_y * dim_world + center_x;
         
         // se i thread superano la dim del mondo ritorno
-        if(index >= dim_world*dim_world) return;
+        if(center_x >= dim_world || center_y >= dim_world) return;
         
         // trovo ID e valore cella data la matrice degli id e indice cella mondo
         int ID = id_matrix[index];
@@ -69,13 +69,14 @@ __global__ void world_update_kernel(
         
         // eseguo un for con dimensione pari al numero massimo di creature per trovare la creatura che ha contribuito di piu 
         int max_id = 0;
-        int max_value = 0;
+        float max_value = 0;
         float ally_energy = 0;
         float enemy_energy = 0;
+        
         for(int i = 0; i < number_of_creatures; i++){
             // prendo il valore di contributo dato ID e indice cella mondo
-            int value = contribution_matrix[i * dim_world * dim_world + index]; 
-            if (i+1 == ID){
+            float value = contribution_matrix[i * dim_world * dim_world + index]; 
+            if (ID == i+1){
                 // se l'id del contributo è uguale all'id della cella allora aumenta l'energia alleata
                 ally_energy = value;      
             }    
@@ -91,8 +92,12 @@ __global__ void world_update_kernel(
         } 
 
         // eseguo i conti se la cella iniziale era libera id=0 
+        //printf("Thread %d ID %d says %f, %f!\n", index, ID, ally_energy, enemy_energy);       
         if (ID == 0){
             if (enemy_energy > 0){
+                
+                
+
                 // calcolo il valore finale come somma pesata del valore iniziale per il contributo, piu la somma del massimo contribuente 
                 // assegno l'id al contribuente maggiore
                 final_value = starting_value * (max_value / enemy_energy) + max_value;
@@ -100,7 +105,7 @@ __global__ void world_update_kernel(
                 
                 // aggiorno il numero di celle vive e salvo l'indice
                 int pos = atomicAdd(cellCount, 1);
-                cells[pos] = index;
+                cells[pos-1] = index;
             }    
         } 
         
@@ -129,7 +134,7 @@ __global__ void world_update_kernel(
 
         // assegno i valori finali alla cella in analisi
         world_value[index] = final_value;                   
-        id_matrix[index] = (int)final_id; 
+        id_matrix[index] = final_id; 
 
     }    
     
@@ -239,21 +244,24 @@ void launch_world_update(
         cellCount,
         cells
     );
+    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori world_update_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
+    
 
 }
 
 //Wrapper cellule cleanup
 void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStream_t stream){
-    if(cellCount == 0) {
+
+    int cellCountR;
+    cudaMemcpy(&cellCountR, cellCount, sizeof(int), cudaMemcpyDeviceToHost);    
+    if(cellCountR == 0) {
         printf("cellCount = 0 \n");
         return;
     }
+    
     int* temp_cellule_cu;
     int* mask_cu;
     bool* mask_alive;
-    int cellCountR;
-    cudaMemcpy(&cellCountR, cellCount, sizeof(int), cudaMemcpyDeviceToHost);    
-    
     cudaMalloc((void**)&mask_alive, cellCountR * sizeof(bool));
     cudaMalloc((void**)&mask_cu, cellCountR * sizeof(int));
     cudaMalloc((void**)&temp_cellule_cu, cellCountR * sizeof(int));
@@ -263,7 +271,8 @@ void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStre
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
     cellule_cleanup_kernel<<<n_block, n_thread_per_block, 0, stream>>>(cells, temp_cellule_cu, id_matrix, cellCount, mask_cu, mask_alive);
-
+    
+    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori cellule_cleanup_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
     cudaFree(temp_cellule_cu);
     cudaFree(mask_alive);
     cudaFree(mask_cu);

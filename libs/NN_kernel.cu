@@ -36,13 +36,12 @@ __global__ void vision_kernel(
     int world_row = (center_row - (raggio / 2) + y + dim_world) % dim_world;
     int world_col = (center_col - (raggio / 2) + x + dim_world) % dim_world;
 
-    int offset = (y*raggio + x)*3;
+    int offset = (y*raggio + x)*2;
     //printf("thread: %d \n",offset);
 
     int world_pos = world_row * dim_world + world_col;
     workspace_addr[offset + 0] = world_value[world_pos];
-    workspace_addr[offset + 1] = static_cast<float>(world_id[world_pos]);
-    workspace_addr[offset + 2] = world_signaling[world_pos];
+    workspace_addr[offset + 1] = world_signaling[world_pos];
 }
 
 // ============================================================================
@@ -283,25 +282,6 @@ __global__ void recombine_models_kernel(
 
 //=================================================================================
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Wrapper kernel visione
 void launch_vision(                 // Testata e funzionante 
     float* world_value,                         // mondo che contiene i valori
@@ -327,6 +307,8 @@ void launch_vision(                 // Testata e funzionante
         raggio,
         input_workspace_addr
     );
+    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori vision_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
+              
 
 
 }
@@ -383,7 +365,9 @@ void launch_NN_forward(                                     // Testata e funzion
                 layer2_size, 
                 weight_offset, 
                 biases_offset
-            );              
+            );  
+            if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori NN_forward_kernel_O: %s\n",cudaGetErrorString(cudaGetLastError()));
+                
         }
         else{
             
@@ -402,6 +386,8 @@ void launch_NN_forward(                                     // Testata e funzion
                 weight_offset, 
                 biases_offset
             );  
+            if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori NN_forward_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
+    
             
         }
 
@@ -446,6 +432,8 @@ void launch_output_elaboration(                                 // Funziona e te
         output_size,
         cell_index
     );
+    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori output_elaboration_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
+    
 
 }
 
