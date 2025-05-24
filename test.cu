@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
+#include <random>
 
 float random_float(float min, float max) {
     return min + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * (max - min);
@@ -29,17 +30,19 @@ int calcola_biases(int *v, int n){
 
 int main() {
 
+    srand(time(0));
+
     int const n          = 3;
-    int world_dim        = 10;
+    int world_dim        = 7;
     int numero_workspace = 10;
     int visione          = 5;
     int input_dim        = visione*visione*3;
     int output_dim       = (3*3)+1;
-    int alive_cell       = 21;
-    int structure[n]     = {input_dim, 20, output_dim};
+    int alive_cell       = 23;
+    int structure[n]     = {input_dim, 2, output_dim};
     int n_weights        = calcola_weights(structure,n);
     int n_baias          = calcola_biases(structure,n);
-    int n_modelli        = 1;
+    int n_modelli        = 3;
 
     cudaStream_t stream = 0;
 
@@ -82,24 +85,24 @@ int main() {
 
     for(int i=0; i<world_dim*world_dim; i++) {
         world_value_h[i] = random_float(0,1);
-        world_id_h[i] = random_float(-1-1,n_modelli+1);
-        world_signal_h[i] = random_float(0,10);
+        world_id_h[i] = random_float(-1,0);
+        world_signal_h[i] = 0;
         alive_cell_h[i] = random_float(0,world_dim*world_dim);
     }
 
     for(int i=0; i<alive_cell; i++){
-        world_id_h[alive_cell_h[i]] = random_float(1,n_modelli);
+        world_id_h[alive_cell_h[i]] = random_float(1,n_modelli+1);
     }
 
     for(int i=0; i<n_modelli*world_dim; i++){
         contribution_matrix_h[i] = 0;
     }
 
-    for(int i=0; i<n_weights; i++){
+    for(int i=0; i<n_weights*n_modelli; i++){
         weight_h[i] = random_float(-1,1);
     }
 
-    for(int i=0; i<n_baias; i++){
+    for(int i=0; i<n_baias*n_modelli; i++){
         baias_h[i] = random_float(-1,1);
     }
 
@@ -136,7 +139,7 @@ int main() {
 
             launch_NN_forward(
                 inputs_d+offset_workspace_in,
-                inputs_d+offset_workspace_in,
+                outputs_d+offset_workspace_out,
                 weight_d,
                 n_weights,
                 baias_d,
@@ -148,13 +151,14 @@ int main() {
                 n,
                 stream
             );
-
+            
+            
             launch_output_elaboration(
                 world_value_d,
                 world_signal_d,
                 world_id_d,
                 contribution_matrix_d,
-                inputs_d+offset_workspace_in,
+                outputs_d+offset_workspace_out,
                 alive_cell_d,
                 world_dim,
                 n_modelli,
@@ -162,10 +166,12 @@ int main() {
                 offset_alive_cell,
                 stream
             );
+            
 
             offset_alive_cell++;
 
         }
+        printf("Cellule fino a %d \n",offset_alive_cell);
 
     }
 

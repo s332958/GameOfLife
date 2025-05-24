@@ -91,9 +91,10 @@ __global__ void NN_forward_kernel(
         }
 
         //printf("thread in azione: %4d, ID: %4d, weight: %4d, output_idx: %4d, input_idx: %4d\n",tidx, ID, weight_index, output_index, input_index);
+        //printf("thread: %4d, input: %4.4f, weight: %4.4f, input_weight: %4.4f output: %d\n",tidx,input_addr[input_index],weights[weight_index],weighted,output_index);
 
         __syncthreads();
-        
+
         // sommo per ogni cella di output i propri pesi
         atomicAdd(&output_addr[output_index], weighted);
         
@@ -111,6 +112,7 @@ __global__ void NN_forward_kernel(
 
         // sommo il bias alla cella di output corretta
         output_addr[tidx] += biases[bias_index];
+        // printf("thread: %4d, bias: %.4f totale_dopo: %4.4f \n",tidx,biases[bias_index],output_addr[tidx]);
 
         // applico la relu ad ogni cella di output modificata 
         output_addr[tidx] = relu(output_addr[tidx]);
@@ -145,7 +147,7 @@ __global__ void output_elaboration_kernel(
     output = sigmoid(output);
 
     //trovo l'indice della cella del mondo per trovare il suo ID, nel mentre trovo i punti dove scrivere l'output
-    int center_index = cells[index];
+    int center_index = cells[cell_index];
     int output_index = index;
     int ID = world_id[center_index];
 
@@ -168,17 +170,19 @@ __global__ void output_elaboration_kernel(
     int raggio = dim_out_window/2;
 
     // trovo le corrispettive x e y di ogni cella modificata (considerando il mondo toroidale)
-    int filter_x = (output_index % dim_out_window - raggio + center_x)%world_dim;
-    int filter_y = (output_index / dim_out_window - raggio + center_y)%world_dim;
+    int filter_x = ((output_index % dim_out_window) - raggio + center_x + world_dim)%world_dim;
+    int filter_y = ((output_index / dim_out_window) - raggio + center_y + world_dim)%world_dim;
     
     // trovo l'indice nel mondo della cella modificata
-    int filter_index = world_dim * world_dim * (ID - 1) + filter_y * world_dim + filter_x;
+    int filter_index = (world_dim * world_dim * (ID - 1)) + (filter_y * world_dim) + filter_x;
 
     // indico un max di quanto ogni cella puo donare del suo valore max
     float frazione_di_se_stesso = 0.05;
 
     // calcolo il valore finale da mettere nella cella dei contributi
     float final_output = center_value * frazione_di_se_stesso * output;
+
+    //printf("thread: %d max: %d idx: %d  ID: %d\n",index,world_dim*world_dim*number_of_creatures,filter_index,ID);
 
     // modifico celle dei contributi circostanti in base al final_output calcolato prima
     atomicAdd(&contribution_matrix[filter_index], final_output);
