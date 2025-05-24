@@ -111,6 +111,7 @@ __global__ void world_update_kernel(
         
         // eseguo i conti se la cella iniziale era occupata id>0
         else{
+            final_value = final_value - 0.05;
             if (starting_value + ally_energy - enemy_energy < 0){
                 // se la cella è occupata e la forza delle celle nemiche supera quella corrente + alleate allora la cella muore e l'eccesso viene lasciato come cibo
                 final_value = abs(starting_value + ally_energy - enemy_energy);

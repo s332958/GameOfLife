@@ -125,7 +125,9 @@ int main() {
     cudaMemcpy(baias_d,                 baias_h,        size_bias,                  cudaMemcpyHostToDevice); 
     cudaMemset(contribution_matrix_d,   0,              size_contribution_matrix);
 
-    for(int y = 0; y < 5; y++){
+    int Step = 0;
+    while(*alive_cell_count_d > 0 && Step < 10){
+    Step++;
     cudaDeviceSynchronize();
     int offset_alive_cell = 0;
     while(offset_alive_cell<*alive_cell_count_d){
