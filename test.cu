@@ -38,7 +38,7 @@ int main() {
     int visione          = 5;
     int input_dim        = visione*visione*3;
     int output_dim       = (3*3)+1;
-    int alive_cell       = 23;
+    int alive_cell       = 1;
     int structure[n]     = {input_dim, 30, output_dim};
     int n_weights        = calcola_weights(structure,n);
     int n_baias          = calcola_biases(structure,n);
@@ -86,7 +86,7 @@ int main() {
     cudaMalloc((void**) &alive_cell_count_d, sizeof(int));
 
     for(int i=0; i<world_dim*world_dim; i++) {
-        world_value_h[i] = random_float(0,1);
+        world_value_h[i] = 0; //random_float(0,1);
         world_id_h[i] = random_float(-1,0);
         world_signal_h[i] = 0;
         alive_cell_h[i] = random_float(0,world_dim*world_dim);
@@ -94,6 +94,7 @@ int main() {
 
     for(int i=0; i<alive_cell; i++){
         world_id_h[alive_cell_h[i]] = random_float(1,n_modelli+1);
+        world_value_h[alive_cell_h[i]] = 1;
     }
 
     for(int i=0; i<n_modelli*world_dim; i++){
@@ -170,6 +171,7 @@ int main() {
                 stream
             );
             
+            cudaStreamSynchronize(stream);
 
             offset_alive_cell++;
 
@@ -189,12 +191,14 @@ int main() {
         stream
     );
 
+    /*
     launch_cellule_cleanup(
         alive_cell_d,
         alive_cell_count_d,
         world_id_d,
         stream
     );
+    */
 
     cudaMemcpy(world_value_h,           world_value_d,          size_world,                 cudaMemcpyDeviceToHost);
     cudaMemcpy(world_signal_h,          world_signal_d,         size_world,                 cudaMemcpyDeviceToHost);
