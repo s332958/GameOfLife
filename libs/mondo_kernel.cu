@@ -1,6 +1,11 @@
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 
+#include <stdio.h>
+#include <iostream>
+#include <cuda_runtime.h>
+#include <random>
+
 // =========================================================================================================
 
 __global__ void add_objects_to_world_kernel(float *world_value, int *world_id, int dim_world, 
@@ -215,18 +220,23 @@ void launch_world_update(
 
 //Wrapper cellule cleanup
 void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStream_t stream){
+    if(cellCount == 0) {
+        printf("cellCount = 0 \n");
+        return;
+    }
     int* temp_cellule_cu;
     int* mask_cu;
-    bool* mask_alive;    
+    bool* mask_alive;
+    int cellCountR;
+    cudaMemcpy(&cellCountR, cellCount, sizeof(int), cudaMemcpyDeviceToHost);    
     
-    cudaMalloc((void**)&mask_alive, *cellCount * sizeof(bool));
-    cudaMalloc((void**)&mask_cu, *cellCount * sizeof(int));
-    cudaMalloc((void**)&temp_cellule_cu, *cellCount * sizeof(int));
+    cudaMalloc((void**)&mask_alive, cellCountR * sizeof(bool));
+    cudaMalloc((void**)&mask_cu, cellCountR * sizeof(int));
+    cudaMalloc((void**)&temp_cellule_cu, cellCountR * sizeof(int));
 
     int n_thread_per_block = 1024; //properties.maxThreadsPerBlock; 
-    int thread_number = *cellCount;
-    int n_block = thread_number / n_thread_per_block;
-    if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1; 
+    int thread_number = cellCountR;
+    int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
     cellule_cleanup_kernel<<<n_block, n_thread_per_block, 0, stream>>>(cells, temp_cellule_cu, id_matrix, cellCount, mask_cu, mask_alive);
 

@@ -83,7 +83,8 @@ int main() {
     cudaMalloc((void**) &weight_d, size_weight);
     cudaMalloc((void**) &baias_d, size_bias);
     cudaMalloc((void**) &contribution_matrix_d, size_contribution_matrix);
-    cudaMalloc((void**) &alive_cell_count_d, sizeof(int));
+    
+    cudaMallocManaged(&alive_cell_count_d, sizeof(int));
 
     for(int i=0; i<world_dim*world_dim; i++) {
         world_value_h[i] = random_float(0,1);
@@ -189,12 +190,16 @@ int main() {
         stream
     );
 
+    printf("launch_world_update \n");
+
     launch_cellule_cleanup(
         alive_cell_d,
         alive_cell_count_d,
         world_id_d,
         stream
     );
+
+    printf("launch_cellule_cleanup \n");
 
     cudaMemcpy(world_value_h,           world_value_d,          size_world,                 cudaMemcpyDeviceToHost);
     cudaMemcpy(world_signal_h,          world_signal_d,         size_world,                 cudaMemcpyDeviceToHost);
