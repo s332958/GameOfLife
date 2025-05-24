@@ -211,7 +211,7 @@ void launch_world_update(
 //Wrapper cellule cleanup
 void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, int* mask_cu, cudaStream_t stream){
     int* temp_cellule_cu;
-    int* mask_cu;
+    //int* mask_cu;
     bool* mask_alive;    
     
     cudaMalloc((void**)&mask_alive, *cellCount * sizeof(bool));
