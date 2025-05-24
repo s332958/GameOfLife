@@ -111,21 +111,25 @@ __global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, in
         
         int idx = threadIdx.x + blockIdx.x * blockDim.x;
         
+        //ritorno i thread che eccedono il numero di cellule vive
         if(idx >= *cellCount) return;
-    
+
+        //inizializzo la maschera a 0 e temp cellule a 0 e alive a false
         mask_cu[idx] = 0;
         temp_cellule_cu[idx] = 0;
         mask_alive[idx] = false;
     
-        
+        // se trovo cellule con id > 0 quindi occupate da creature segno 1 in mask_cu e true in mask_alive
         if(id_matrix[cellule_cu[idx]] > 0){
            mask_cu[idx] = 1; 
            mask_alive[idx] = true;
-        }    
+        }  
+        // dichiaro un valore di parallelizzazione?  
         int dim_paral = 10;
         int id_sort_x = idx % dim_paral;
         int id_sort_y = idx / dim_paral;
-    
+        
+        // indice di ordinamento?
         int index_sort = id_sort_y * dim_paral + id_sort_x;
         
         if (id_sort_x == 0){
@@ -135,7 +139,8 @@ __global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, in
                 if(index_sort + i < *cellCount){ 
                     increment = increment + mask_cu[index_sort + i];               
                     mask_cu[index_sort + i] = increment;
-                }                
+                }
+                                
             }    
         }    
         __syncthreads();
@@ -209,9 +214,9 @@ void launch_world_update(
 }
 
 //Wrapper cellule cleanup
-void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, int* mask_cu, cudaStream_t stream){
+void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStream_t stream){
     int* temp_cellule_cu;
-    //int* mask_cu;
+    int* mask_cu;
     bool* mask_alive;    
     
     cudaMalloc((void**)&mask_alive, *cellCount * sizeof(bool));

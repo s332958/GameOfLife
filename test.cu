@@ -39,7 +39,7 @@ int main() {
     int input_dim        = visione*visione*3;
     int output_dim       = (3*3)+1;
     int alive_cell       = 23;
-    int structure[n]     = {input_dim, 2, output_dim};
+    int structure[n]     = {input_dim, 30, output_dim};
     int n_weights        = calcola_weights(structure,n);
     int n_baias          = calcola_biases(structure,n);
     int n_modelli        = 3;
@@ -72,6 +72,7 @@ int main() {
     float *weight_d;
     float *baias_d;     
     float *contribution_matrix_d;
+    int   *alive_cell_count_d;
 
     cudaMalloc((void**) &world_value_d, size_world);
     cudaMalloc((void**) &world_signal_d, size_world);
@@ -82,6 +83,7 @@ int main() {
     cudaMalloc((void**) &weight_d, size_weight);
     cudaMalloc((void**) &baias_d, size_bias);
     cudaMalloc((void**) &contribution_matrix_d, size_contribution_matrix);
+    cudaMalloc((void**) &alive_cell_count_d, sizeof(int));
 
     for(int i=0; i<world_dim*world_dim; i++) {
         world_value_h[i] = random_float(0,1);
@@ -115,6 +117,7 @@ int main() {
     cudaMemcpy(weight_d,                weight_h,       size_weight,                cudaMemcpyHostToDevice);
     cudaMemcpy(baias_d,                 baias_h,        size_bias,                  cudaMemcpyHostToDevice); 
     cudaMemset(contribution_matrix_d,   0,              size_contribution_matrix);
+    cudaMemcpy(alive_cell_count_d,      &alive_cell,     sizeof(int),                cudaMemcpyHostToDevice); 
 
     int offset_alive_cell = 0;
     while(offset_alive_cell<alive_cell){
@@ -175,6 +178,24 @@ int main() {
 
     }
 
+    launch_world_update(
+        world_value_d,
+        world_id_d,
+        contribution_matrix_d,
+        alive_cell_d,
+        world_dim,
+        n_modelli,
+        alive_cell_count_d,
+        stream
+    );
+
+    launch_cellule_cleanup(
+        alive_cell_d,
+        alive_cell_count_d,
+        world_id_d,
+        stream
+    );
+
     cudaMemcpy(world_value_h,           world_value_d,          size_world,                 cudaMemcpyDeviceToHost);
     cudaMemcpy(world_signal_h,          world_signal_d,         size_world,                 cudaMemcpyDeviceToHost);
     cudaMemcpy(world_id_h,              world_id_d,             size_world,                 cudaMemcpyDeviceToHost);
@@ -184,6 +205,7 @@ int main() {
     cudaMemcpy(weight_h,                weight_d,               size_weight,                cudaMemcpyDeviceToHost);
     cudaMemcpy(baias_h,                 baias_d,                size_bias,                  cudaMemcpyDeviceToHost); 
     cudaMemcpy(contribution_matrix_h,   contribution_matrix_d,  size_contribution_matrix,   cudaMemcpyDeviceToHost); 
+    cudaMemcpy(&alive_cell,             alive_cell_count_d,     sizeof(int),                cudaMemcpyDeviceToHost); 
 
 
     std::cout << "\n=== WORLD VALUE ===\n";
@@ -247,11 +269,14 @@ int main() {
     }
     printf("\n");
 
-    printf("=== MODELLO ===\n");
+    printf("\n=== MODELLO ===\n");
     printf("BIASES :  %d\n", n_baias);
     printf("WEIGHTS:  %d\n", n_weights);
 
-    printf("=== DEVICE POINTERS ===\n");
+    printf("\n===Alive Cell===\n");
+    printf("%4d",alive_cell);
+
+    printf("\n=== DEVICE POINTERS ===\n");
     printf("WORLD VALUE  (float*): %p\n", (void*)world_value_d);
     printf("WORLD SIGNAL (float*): %p\n", (void*)world_signal_d);
     printf("WORLD ID     (int*)  : %p\n", (void*)world_id_d);
