@@ -1,5 +1,8 @@
+#include "utils_kernel.cuh"
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
+#include <stdio.h>
+
 
 
 // ============================================================================
@@ -16,16 +19,6 @@ __global__ void fill_random_kernel(float* d_vec, int n, float minVal, float maxV
     d_vec[idx] = minVal + rand_uniform * (maxVal - minVal);
 }
 
-// =========================================================================================================
-
-template <typename T>
-__global__ void resetKernel(T* d_vec, int n) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= n) return;
-    d_vec[idx] = T(0);  // assegna zero del tipo T
-}
-
-// ============================================================================
 
 
 // Wrapper: fill vettore random con calcolo griglia/thread
@@ -38,11 +31,20 @@ void launch_fill_random_kernel(float* d_vec, int n, float minVal, float maxVal,
     fill_random_kernel<<<blocks, threads, 0, stream>>>(d_vec, n, minVal, maxVal, seed);
 
 }
+template <typename T>
+__global__ void resetKernel(T* d_vec, int n) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= n) return;
+    d_vec[idx] = T(0);
+}
 
 template <typename T>
-void launch_reset_kernel(T* d_vec, int n, cudaStream_t stream = 0) {
+void launch_reset_kernel(T* d_vec, int n, cudaStream_t stream) {
     int threads = 256;
     int blocks = (n + threads - 1) / threads;
     resetKernel<T><<<blocks, threads, 0, stream>>>(d_vec, n);
 }
 
+// ========== Esplicit template instantiation ==========
+template void launch_reset_kernel<float>(float*, int, cudaStream_t);
+template void launch_reset_kernel<int>(int*, int, cudaStream_t);

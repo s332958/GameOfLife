@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 #include <iostream>
+#include "mondo_kernel.cuh"
 
 #include <stdio.h>
 #include <iostream>

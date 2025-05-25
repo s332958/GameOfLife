@@ -1,3 +1,9 @@
+
+#include "mappa_colori.cuh"
+#include <cuda_runtime.h>
+#include <curand_kernel.h>
+#include <iostream>
+
 // Dichiaro la memoria costante in GPU dove verranno tenuti i colori per poi fare il rendering
 extern __constant__ float COLORI[100][3];
 // Numero di colori massimi 

@@ -1,3 +1,5 @@
+#include "NN_kernel.cuh"
+
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 #include <iostream>
