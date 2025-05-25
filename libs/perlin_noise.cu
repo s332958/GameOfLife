@@ -44,7 +44,7 @@ __device__ float perlin(float x, float y) {
 // Kernel: applica il Perlin noise + soglia
 __global__ void perlinNoiseThreshold_kernel(
     int* world_id_d, int world_dim,
-    float scale, float threshold
+    float scale, float threshold,
     float* offset_x, float* offset_y)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
