@@ -82,8 +82,9 @@ void simulazione(
     int   *occupation_vector_h = (int*)   malloc(tot_eval_vector_size);
     int   *creature_ordered_h  = (int*)   malloc(tot_eval_vector_size);
     int   *alive_cells_h       = (int*)   malloc(tot_world_dim_size_int);
-    int   *n_cell_alive_h      = (int*)   malloc(sizeof(int));
-    cudaMallocManaged(&n_cell_alive_h, sizeof(int));
+    int   *n_cell_alive_h      ; // = (int*)   malloc(sizeof(int));
+    // cudaMallocManaged(&n_cell_alive_h, sizeof(int));
+    cudaHostAlloc((void**)&n_cell_alive_h, sizeof(int), cudaHostAllocMapped);
     float *model_weights_h     = nullptr;
     float *model_biases_h      = nullptr;
 
@@ -117,7 +118,8 @@ void simulazione(
     //int   *creature_ordered_d  = (int*)   cuda_allocate(tot_eval_vector_size, cc_major, streams[0]);
     float *new_model_weights_d = (float*) cuda_allocate(tot_models_weight_size, cc_major, streams[0]);
     float *new_model_biases_d  = (float*) cuda_allocate(tot_models_bias_size, cc_major, streams[0]);
-    int   *n_cell_alive_d      = (int*)   cuda_allocate(sizeof(int), cc_major, streams[0]);
+    int   *n_cell_alive_d      ; // = (int*)   cuda_allocate(sizeof(int), cc_major, streams[0]);
+    cudaHostGetDevicePointer(&n_cell_alive_d, n_cell_alive_h , 0);
 
     /*
     
@@ -249,6 +251,8 @@ void simulazione(
         save_map(file,world_dim,world_value_h,world_id_h);
         printf("RETURN VIEW WORLD SETUP\n");
 
+        cudaDeviceSynchronize();
+
         /*======================================================================================================================================*/
         for(int step=0; step<N_STEPS; step++){
             if(render){
@@ -289,6 +293,12 @@ void simulazione(
                         workspace_input_d+offset_workspace_in,
                         streams[offset_alive_cell]
                     );
+
+                    // printf("INPUT_WORKSPACE:   %p \n",workspace_input_d);
+                    // printf("MODEL_WEIGHTS:     %p \n",model_weights_d);
+                    // printf("MODEL_BIASES:      %p \n",model_biases_d);
+                    // printf("ALIVE_CELLS:       %p \n",alive_cells_d);
+                    // printf("")
 
                     launch_NN_forward(
                         workspace_input_d+offset_workspace_in,
@@ -333,6 +343,7 @@ void simulazione(
             }
             */
             cudaDeviceSynchronize();
+
             launch_world_update(
                 world_value_d,
                 world_id_d,
@@ -340,7 +351,7 @@ void simulazione(
                 alive_cells_d,
                 world_dim,
                 n_creature,
-                n_cell_alive_h,
+                n_cell_alive_d,
                 streams[0]
             );
             printf("launch_world_update \n");
@@ -348,7 +359,7 @@ void simulazione(
 
             launch_cellule_cleanup(
                 alive_cells_d,
-                n_cell_alive_h,
+                n_cell_alive_d,
                 world_id_d,
                 streams[0]
             );
@@ -506,7 +517,7 @@ void simulazione(
     free(creature_ordered_h);
     free(model_weights_h);
     free(model_biases_h);
-    free(n_cell_alive_h);
+    cudaFreeHost(n_cell_alive_h);
     
     
     printf("FREE DONE\n");

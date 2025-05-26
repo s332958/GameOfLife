@@ -75,6 +75,7 @@ __global__ void NN_forward_kernel(
         // ottengo l'indice di dove si trova la cella viva cosi poi accedo al suo ID per capire che modello usare
         int world_index = cells[cell_index];
         int ID = world_id[world_index];
+        //printf("thread: %d ID: %d index: %d \n",tidx, ID, world_index);
 
         // ottengo l'accesso ai pesi del modello corretto 
         int weight_index = n_weights * (ID - 1) + tidx + offset_weights; // + offset pesi siccome dipendono dal layer (es layer0 offeset=0, layer1 offset=layer0*layer1)

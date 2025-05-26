@@ -14,27 +14,27 @@
 #include <format>
 
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
-const int world_dim = 1024;
+const int world_dim = 10;
 const int n_creature = 5;
 const int n_layer = 5;
-int model_structure [n_layer] = {162, 16, 16, 16, 10};
+int model_structure [n_layer] = {18, 11, 10, 10, 10};
 float * weights_models = nullptr; 
 float * biases_models = nullptr; 
 int const METHOD_EVAL = 0;
 
-size_t reserve_free_memory = 1024 * 1024 * 1024;// 1GB
+size_t reserve_free_memory = 1024 * 1024; // * 1024;// 1GB
 int const MAX_WORKSPACE = 10000;
+
+const int MAX_CREATURE = 64;
 
 GLFWwindow* window;
 GLuint textureID;
-
-float colori[21][3]; // 21 perché includiamo l'indice 0
 
 int main(int argc, char* argv[]) {
     clock_t start = clock();  // Start time 
     bool render = false;
     int numero_epoch = 1;
-    int numero_step = 100;
+    int numero_step = 1;
     
     // Controlla se c'è almeno un argomento
     for (int i = 1; i < argc; ++i) {
@@ -49,8 +49,6 @@ int main(int argc, char* argv[]) {
             numero_step = std::atoi(argv[i+1]);
         }
     }
-
-    const int MAX_CREATURE = 64;
     
     //creazione finestra opengl
     if(render){

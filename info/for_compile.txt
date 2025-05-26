@@ -11,3 +11,12 @@ python3 python_utils/renderer.py 0
 
 //per vedere l'occupazione di memoria nella GPU
 nvidia-smi
+
+
+
+
+
+// per compilare il file nuovo
+
+nvcc -arch=sm_50 -o testnew main.cpp simulazione.cpp libs/mappa_colori.cu libs/mondo_kernel.cu libs/NN_kernel.cu libs/utils_cpu.cpp libs/utils_kernel.cu -lGL -lglfw -lGLEW
+compute-sanitizer ./testnew

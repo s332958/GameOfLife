@@ -145,6 +145,14 @@ __global__ void world_update_kernel(
 __global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, int *id_matrix, int* cellCount, int* mask_cu, bool* mask_alive){
         
         int idx = threadIdx.x + blockIdx.x * blockDim.x;
+
+        if(idx==0){
+            for(int i=0; i<*cellCount; i++){
+                printf("cell alive idx: %d \n",cellule_cu[i]);
+            }
+        }
+
+        __syncthreads();
         
         //ritorno i thread che eccedono il numero di cellule vive
         if(idx >= *cellCount) return;
@@ -159,6 +167,7 @@ __global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, in
            mask_cu[idx] = 1; 
            mask_alive[idx] = true;
         }  
+        //printf("ID_MATRIX: %d IDX: %d T: %d cell count: %d\n",id_matrix[cellule_cu[idx]],cellule_cu[idx],idx,*cellCount);
         // dichiaro un valore di parallelizzazione 32 è ottimale poicheè è la dimensione di un warp
         int dim_paral = 32;
         int id_sort_x = idx % dim_paral;
@@ -271,6 +280,12 @@ void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStre
     int n_thread_per_block = 1024; //properties.maxThreadsPerBlock; 
     int thread_number = cellCountR;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
+
+    printf("MASK ALIVE:   %p \n", mask_alive);
+    printf("MASK CU:      %p \n", mask_cu);
+    printf("TEMP CELLULE: %p \n", temp_cellule_cu);
+    printf("CELLS:        %p \n", cells);
+    printf("ID MATRIX:    %p \n", id_matrix);
 
     cellule_cleanup_kernel<<<n_block, n_thread_per_block, 0, stream>>>(cells, temp_cellule_cu, id_matrix, cellCount, mask_cu, mask_alive);
     
