@@ -106,7 +106,8 @@ __global__ void world_update_kernel(
                 
                 // aggiorno il numero di celle vive e salvo l'indice
                 int pos = atomicAdd(cellCount, 1);
-                cells[pos-1] = index;
+                cells[pos] = index;
+                printf("UPDATE CELL ALIVE: %d con index %d \n",pos-1,index);
             }    
         } 
         
@@ -138,7 +139,7 @@ __global__ void world_update_kernel(
         world_value[index] = final_value;                   
         id_matrix[index] = final_id; 
 
-    }    
+}    
     
     //==============================================================================================
     
@@ -148,7 +149,7 @@ __global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, in
 
         if(idx==0){
             for(int i=0; i<*cellCount; i++){
-                printf("cell alive idx: %d \n",cellule_cu[i]);
+                printf("cell alive idx: %d  numero cellule vive: %d\n",cellule_cu[i],*cellCount);
             }
         }
 
@@ -276,6 +277,10 @@ void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStre
     cudaMalloc((void**)&mask_alive, cellCountR * sizeof(bool));
     cudaMalloc((void**)&mask_cu, cellCountR * sizeof(int));
     cudaMalloc((void**)&temp_cellule_cu, cellCountR * sizeof(int));
+
+    cudaMemset(mask_alive,0,cellCountR * sizeof(bool));
+    cudaMemset(mask_cu,0,cellCountR * sizeof(int));
+    cudaMemset(temp_cellule_cu,0,cellCountR * sizeof(int));
 
     int n_thread_per_block = 1024; //properties.maxThreadsPerBlock; 
     int thread_number = cellCountR;
