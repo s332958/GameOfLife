@@ -96,6 +96,7 @@ int main() {
 
     for(int i=0; i<world_dim*world_dim; i++) {
         world_value_h[i] = 0.0;
+        world_id_h[i] = 0;
         world_signal_h[i] = 0;
     }
 
@@ -208,13 +209,14 @@ int main() {
 
         // printf("launch_world_update \n");
         cudaDeviceSynchronize();
+        
         launch_cellule_cleanup(
             alive_cell_d,
             alive_cell_count_d,
             world_id_d,
             stream
         );
-
+        
         // printf("launch_cellule_cleanup \n");
 
         cudaMemcpy(world_value_h,           world_value_d,          size_world_float,                 cudaMemcpyDeviceToHost);
@@ -228,7 +230,7 @@ int main() {
         cudaMemcpy(contribution_matrix_h,   contribution_matrix_d,  size_contribution_matrix,         cudaMemcpyDeviceToHost); 
         cudaMemcpy(&alive_cell_count_h,     alive_cell_count_d,     sizeof(int),                      cudaMemcpyDeviceToHost);
 
-        /*
+        
         std::cout << "\n=== WORLD VALUE ===\n";
         for (int y = 0; y < world_dim; y++) {
             for (int x = 0; x < world_dim; x++) {
@@ -244,6 +246,7 @@ int main() {
             }
             std::cout << "\n";
         }
+            /*
 
         std::cout << "\n=== CONTRIBUTION MATRIX===\n";
         for(int i=0; i<world_dim; i++){
@@ -278,15 +281,14 @@ int main() {
             std::cout << "\n";
         }
 
-        *//*
+        */
 
         std::cout << "\n=== ALIVE CELLS ===\n";
         for (int i = 0; i < alive_cell_count_h; i++) {
             std::cout << "Alive[" << i << "] = " << alive_cell_h[i] << "\n";
         }
 
-        /*
-
+        /* 
         std::cout << "\n=== INPUTS (workspace x input_dim) ===\n";
         for (int ws = 0; ws < numero_workspace; ws++) {
             std::cout << "Workspace " << ws << ": \n";

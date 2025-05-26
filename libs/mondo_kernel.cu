@@ -79,7 +79,7 @@ __global__ void world_update_kernel(
             float value = contribution_matrix[i * dim_world * dim_world + index]; 
             if (ID == i+1){
                 // se l'id del contributo è uguale all'id della cella allora aumenta l'energia alleata
-                ally_energy = value;      
+                ally_energy += value;      
             }    
             else{
                 // se l'id del contributo è diverso dall'id della cella corrente allora aumenta l'energia nemica
@@ -107,7 +107,7 @@ __global__ void world_update_kernel(
                 // aggiorno il numero di celle vive e salvo l'indice
                 int pos = atomicAdd(cellCount, 1);
                 cells[pos] = index;
-                printf("UPDATE CELL ALIVE: %d con index %d \n",pos-1,index);
+                //printf("UPDATE CELL ALIVE: %d con index %d \n",pos-1,index);
             }    
         } 
         
