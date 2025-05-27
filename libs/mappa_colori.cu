@@ -7,14 +7,12 @@
 // Dichiaro la memoria costante in GPU dove verranno tenuti i colori per poi fare il rendering
 __constant__ float COLORI[100][3];
 
-// Numero di colori massimi 
-const int MAX_CREATURE = 100;
 
 // Dichiaro i colori in host
-void generateDistinctColors(int* colors) {
-    for (int i = 0; i < MAX_CREATURE; ++i) {
+void generateDistinctColors(float* colors, int n_creature) {
+    for (int i = 0; i < n_creature; ++i) {
         // HSV -> RGB conversion per generare colori distinti
-        float h = (i * 360.0f / MAX_CREATURE);
+        float h = (i * 360.0f / n_creature);
         float s = 1.0f;
         float v = 1.0f;
 
@@ -37,9 +35,9 @@ void generateDistinctColors(int* colors) {
 }
 
 // Passo i colori in GPU e poi libero l'allocazione in Host
-void load_constant_memory_GPU() {
-    int *color_h = (int*) malloc(sizeof(int)*MAX_CREATURE*3);
-    generateDistinctColors(color_h);
+void load_constant_memory_GPU(int n_creature) {
+    float *color_h = (float*) malloc(sizeof(int)*n_creature*3);
+    generateDistinctColors(color_h, n_creature);
 
     cudaMemcpyToSymbol(COLORI, color_h, sizeof(float) * 100 * 3);
     free(color_h);
@@ -52,24 +50,27 @@ __global__ void mappa_colori_kernel(float* mondo, int* id_matrix, float* mondo_r
 
     if (index >= thread_number) return;
 
-    int center_index = index / 3;
-    int RGB_index = index % 3;
-    
-    int ID = id_matrix[center_index];
-    
-    if (ID == -1) {//rosso
-        if(RGB_index == 0){
-            mondo_rgb[center_index + RGB_index] = 255.0f;
-        }else{
-            mondo_rgb[center_index + RGB_index] = 0.0f;
-        }
-    } else if (ID == 0) {
-        mondo_rgb[center_index + RGB_index] = 255.0f*mondo[center_index]/65025.0f;
-    } else if (ID >= 1 && ID <= 20) {
-        mondo_rgb[center_index + RGB_index] = COLORI[ID][RGB_index]*mondo[center_index]/65025.0f;
-    } else {
-        mondo_rgb[center_index + RGB_index] = 0.0f; 
+    int pixel_index = index / 3;
+    int channel = index % 3;
+
+    int ID = id_matrix[pixel_index];
+    float value = mondo[pixel_index];
+
+    int out_index = pixel_index * 3 + channel;
+
+    if (ID == -1) {
+        mondo_rgb[out_index] = (channel == 0) ? 1.0f : 0.0f;  // rosso per ostacoli
     }
+    else if (ID == 0) {
+        mondo_rgb[out_index] = value;  // scala di grigi
+    }
+    else if (ID >= 1 && ID <= 20) {
+        mondo_rgb[out_index] = COLORI[ID][channel] * value * 4;
+    }
+    else {
+        mondo_rgb[out_index] = 0.0f;
+    }
+
 }
 
 

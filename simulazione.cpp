@@ -24,12 +24,7 @@ void simulazione(
     GLFWwindow* window, GLuint textureID
 ) {
 
-    // -------------------------------------------
-    // PRE-FASE : Inizializzo colori per il rendering
-    // -------------------------------------------
-    if(render){
-        load_constant_memory_GPU();
-    }
+
 
 
     FILE *file = fopen("output.txt","w");
@@ -255,9 +250,9 @@ void simulazione(
         CUDA_CHECK(cudaGetLastError());
         */
         // - Aggiunta cibo al mondo
-        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.2f, streams[0]);
+        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.85f, streams[0]);
         CUDA_CHECK(cudaGetLastError());
-
+        
         // - Ritorno mondo valori e mondo id definitivi su CPU per debug 
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, streams[0]);
         CUDA_CHECK(cudaGetLastError());
@@ -273,7 +268,7 @@ void simulazione(
         /*======================================================================================================================================*/
         for(int step=0; step<N_STEPS && *n_cell_alive_h > 0; step++){
             printf("CELLULE VIVE = %d \n",*n_cell_alive_h);
-            usleep(500000);
+            //usleep(500000);
             // attivazione del render se il flag è attivo
             if(render){
                 if (glfwWindowShouldClose(window)) {
@@ -396,7 +391,9 @@ void simulazione(
                 cudaMemcpy(world_rgb_h, world_rgb_d, tot_world_dim_size_float * 3, cudaMemcpyDeviceToHost);
 
                 // Carica i dati nella texture OpenGL
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, world_dim, world_dim, 0, GL_RGB, GL_FLOAT, world_rgb_h);
+                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, world_dim, world_dim, GL_RGB, GL_FLOAT, world_rgb_h);
+
+                //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, world_dim, world_dim, 0, GL_RGB, GL_FLOAT, world_rgb_h);
 
                 // Pulizia del buffer di colore
                 glClear(GL_COLOR_BUFFER_BIT);
@@ -414,7 +411,17 @@ void simulazione(
 
                 // Gestione degli eventi
                 glfwPollEvents();
+                /*
                 std::cout << "\n=== RGB MATRIX===\n";
+                
+                for (int y = 0; y < world_dim; y++) {
+                    for (int x = 0; x < world_dim; x++) {
+                        printf("%.4f ", world_rgb_h[(y * world_dim + x)*3]);
+                    }
+                    std::cout << "\n";
+                }
+                */
+                
 
             } 
 
@@ -432,6 +439,7 @@ void simulazione(
             // - Ritorno alive_cell_d
             cuda_memcpy(alive_cells_h, alive_cells_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
             CUDA_CHECK(cudaGetLastError());   
+            /*
             
             std::cout << "\n=== ALIVE CELLS ===\n";
             for (int i = 0; i < *n_cell_alive_h; i++) {
@@ -439,7 +447,7 @@ void simulazione(
                 std::cout << " (" << world_id_h[alive_cells_h[i]] << ")\n";
 
             }
-
+            */
 
             // salvo il mondo per debug 
             save_map(file,world_dim,world_value_h,world_id_h);

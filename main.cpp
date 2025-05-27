@@ -14,7 +14,7 @@
 #include <format>
 
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
-const int world_dim = 10;
+const int world_dim = 400;
 const int n_creature = 5;
 const int n_layer = 5;
 int model_structure [n_layer] = {18, 1, 1, 1, 10};
@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    //creazione finestra opengl
+    //fuori dal ciclo
     if(render){
         if (!glfwInit()) {
             std::cerr << "Errore nell'inizializzazione di GLFW" << std::endl;
@@ -70,14 +70,30 @@ int main(int argc, char* argv[]) {
     
         glfwMakeContextCurrent(window);
 
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        glViewport(0, 0, width, height);  // Usa tutta la finestra
+
+
+        // Proiezione ortografica
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
+        // Texture config
         glEnable(GL_TEXTURE_2D);
         glGenTextures(1, &textureID);
         glBindTexture(GL_TEXTURE_2D, textureID);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, world_dim, world_dim, 0, GL_RGB, GL_FLOAT, nullptr);
 
         //creazione colori
-        load_constant_memory_GPU();
+        load_constant_memory_GPU(n_creature);
     }
 
 
