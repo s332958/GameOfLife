@@ -147,14 +147,6 @@ __global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, in
         
         int idx = threadIdx.x + blockIdx.x * blockDim.x;
 
-        if(idx==0){
-            for(int i=0; i<*cellCount; i++){
-                printf("cell alive idx: %d  numero cellule vive: %d\n",cellule_cu[i],*cellCount);
-            }
-        }
-
-        __syncthreads();
-        
         //ritorno i thread che eccedono il numero di cellule vive
         if(idx >= *cellCount) return;
 
@@ -267,7 +259,7 @@ void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStre
     int cellCountR;
     cudaMemcpy(&cellCountR, cellCount, sizeof(int), cudaMemcpyDeviceToHost);    
     if(cellCountR == 0) {
-        printf("cellCount = 0 \n");
+        // printf("cellCount = 0 \n");
         return;
     }
     
@@ -285,12 +277,6 @@ void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStre
     int n_thread_per_block = 1024; //properties.maxThreadsPerBlock; 
     int thread_number = cellCountR;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
-
-    printf("MASK ALIVE:   %p \n", mask_alive);
-    printf("MASK CU:      %p \n", mask_cu);
-    printf("TEMP CELLULE: %p \n", temp_cellule_cu);
-    printf("CELLS:        %p \n", cells);
-    printf("ID MATRIX:    %p \n", id_matrix);
 
     cellule_cleanup_kernel<<<n_block, n_thread_per_block, 0, stream>>>(cells, temp_cellule_cu, id_matrix, cellCount, mask_cu, mask_alive);
     
