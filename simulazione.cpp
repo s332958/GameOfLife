@@ -11,6 +11,7 @@
 #include <iostream>
 #include <cuda_runtime.h>
 #include <cmath>
+#include <unistd.h> 
 
 
 
@@ -267,13 +268,14 @@ void simulazione(
         cudaDeviceSynchronize();
 
         /*======================================================================================================================================*/
-        for(int step=0; step<N_STEPS; step++){
-
+        for(int step=0; step<N_STEPS && *n_cell_alive_h > 0; step++){
+            printf("CELLULE VIVE = %d \n",*n_cell_alive_h);
+            usleep(500000);
             // attivazione del render se il flag è attivo
             if(render){
                 if (glfwWindowShouldClose(window)) {
                     std::cout << "Finestra chiusa. Terminazione del programma." << std::endl;
-                    break; // Esce dal ciclo
+                    goto fine;
                 }
             }
             std::cout << "Step " << step << "\n";
@@ -348,7 +350,7 @@ void simulazione(
                     );
 
                     offset_alive_cell++;
-                    printf("CELLULE FINO A %d \n",offset_alive_cell);
+                    //printf("CELLULE FINO A %d \n",offset_alive_cell);
 
                 }
 
@@ -370,16 +372,17 @@ void simulazione(
                 n_cell_alive_d,
                 streams[0]
             );
-            printf("launch_world_update \n");
+            //printf("launch_world_update \n");
 
 
             launch_cellule_cleanup(
                 alive_cells_d,
+                n_cell_alive_h,
                 n_cell_alive_d,
                 world_id_d,
                 streams[0]
             );
-            printf("launch_cellule_cleanup \n");
+            //printf("launch_cellule_cleanup \n");
 
             // se il render è attivo genero la schermata con openGL
             if(render){
@@ -507,6 +510,7 @@ void simulazione(
     // -------------------------------------------
     // POST-FASE : 
     // -------------------------------------------
+    fine:
 
     if(render){
         glDeleteTextures(1, &textureID);

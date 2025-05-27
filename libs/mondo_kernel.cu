@@ -254,10 +254,9 @@ void launch_world_update(
 }
 
 //Wrapper cellule cleanup
-void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStream_t stream){
+void launch_cellule_cleanup(int* cells, int* cellCount_h, int* cellCount_d, int* id_matrix, cudaStream_t stream){
 
-    int cellCountR;
-    cudaMemcpy(&cellCountR, cellCount, sizeof(int), cudaMemcpyDeviceToHost);    
+    int cellCountR = *cellCount_h;
     if(cellCountR == 0) {
         // printf("cellCount = 0 \n");
         return;
@@ -278,7 +277,7 @@ void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStre
     int thread_number = cellCountR;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
-    cellule_cleanup_kernel<<<n_block, n_thread_per_block, 0, stream>>>(cells, temp_cellule_cu, id_matrix, cellCount, mask_cu, mask_alive);
+    cellule_cleanup_kernel<<<n_block, n_thread_per_block, 0, stream>>>(cells, temp_cellule_cu, id_matrix, cellCount_d, mask_cu, mask_alive);
     
     if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori cellule_cleanup_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
     cudaFree(temp_cellule_cu);

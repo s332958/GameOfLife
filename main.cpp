@@ -14,7 +14,7 @@
 #include <format>
 
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
-const int world_dim = 300;
+const int world_dim = 20;
 const int n_creature = 5;
 const int n_layer = 5;
 int model_structure [n_layer] = {18, 1, 1, 1, 10};

@@ -75,7 +75,7 @@ __global__ void NN_forward_kernel(
         // ottengo l'indice di dove si trova la cella viva cosi poi accedo al suo ID per capire che modello usare
         int world_index = cells[cell_index];
         int ID = world_id[world_index];
-        printf("thread: %d ID: %d index: %d \n",tidx, ID, world_index);
+        //printf("thread: %d ID: %d index: %d \n",tidx, ID, world_index);
 
         // ottengo l'accesso ai pesi del modello corretto 
         int weight_index = n_weights * (ID - 1) + tidx + offset_weights; // + offset pesi siccome dipendono dal layer (es layer0 offeset=0, layer1 offset=layer0*layer1)
@@ -91,9 +91,11 @@ __global__ void NN_forward_kernel(
         if (tidx < layer2_size){
             output_addr[tidx] = 0;
         }
-
+        /*
+        
         printf("thread in azione: %4d, ID: %4d, weight: %4d, output_idx: %4d, input_idx: %4d\n",tidx, ID, weight_index, output_index, input_index);
         printf("thread: %4d, input: %4.4f, weight: %4.4f, input_weight: %4.4f output: %d\n",tidx,input_addr[input_index],weights[weight_index],weighted,output_index);
+        */
 
         __syncthreads();
 

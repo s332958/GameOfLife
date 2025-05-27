@@ -19,4 +19,4 @@ void launch_world_update(float* world_value,
                          cudaStream_t stream);
 
 // Wrapper per ripulire celle disattivate
-void launch_cellule_cleanup(int* cells, int* cellCount, int* id_matrix, cudaStream_t stream);
+void launch_cellule_cleanup(int* cells,  int* cellCount_h, int* cellCount_d, int* id_matrix, cudaStream_t stream);
