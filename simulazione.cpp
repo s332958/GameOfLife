@@ -161,6 +161,7 @@ void simulazione(
 
     // CARIMENTO DATI
     if(biases_models==nullptr && weights_models==nullptr){
+
         // Generation random models
         launch_fill_random_kernel(model_weights_d,n_weight*n_creature,-1.0f,1.0f,0,streams[0]);
         CUDA_CHECK(cudaGetLastError());
@@ -248,9 +249,11 @@ void simulazione(
         cuda_memcpy(alive_cells_d, alive_cells_h, tot_world_dim_size_int, cudaMemcpyHostToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
+        /*
         // - Aggiunta ostacoli al mondo
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, streams[0]);
         CUDA_CHECK(cudaGetLastError());
+        */
         // - Aggiunta cibo al mondo
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.2f, streams[0]);
         CUDA_CHECK(cudaGetLastError());
@@ -361,7 +364,8 @@ void simulazione(
                 }
 
             }
-
+            
+            cudaDeviceSynchronize();
             launch_world_update(
                 world_value_d,
                 world_id_d,
@@ -374,7 +378,7 @@ void simulazione(
             );
             //printf("launch_world_update \n");
 
-
+            cudaDeviceSynchronize();
             launch_cellule_cleanup(
                 alive_cells_d,
                 n_cell_alive_h,
@@ -410,6 +414,8 @@ void simulazione(
 
                 // Gestione degli eventi
                 glfwPollEvents();
+                std::cout << "\n=== RGB MATRIX===\n";
+
             } 
 
             // - Aggiornamento vettori valutazione occupazione ed energia
@@ -422,7 +428,17 @@ void simulazione(
             CUDA_CHECK(cudaGetLastError());
             // - Ritorno mondo id 
             cuda_memcpy(world_id_h, world_id_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
-            CUDA_CHECK(cudaGetLastError());            
+            CUDA_CHECK(cudaGetLastError());    
+            // - Ritorno alive_cell_d
+            cuda_memcpy(alive_cells_h, alive_cells_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
+            CUDA_CHECK(cudaGetLastError());   
+            
+            std::cout << "\n=== ALIVE CELLS ===\n";
+            for (int i = 0; i < *n_cell_alive_h; i++) {
+                std::cout << "Alive[" << i << "] = " << alive_cells_h[i] << "\n";
+                std::cout << " (" << world_id_h[alive_cells_h[i]] << ")\n";
+
+            }
 
 
             // salvo il mondo per debug 

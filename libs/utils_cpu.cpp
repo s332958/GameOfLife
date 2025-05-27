@@ -162,10 +162,10 @@ void save_map(
 
     for(int riga=0; riga<dim_world; riga++){
         for(int colonna=0; colonna<dim_world; colonna++){
-            fprintf(file,"%.2f %3d ",world_value[riga*dim_world+colonna],world_id[riga*dim_world+colonna]);
+            fprintf(file,"%.2f(%3d)  ",world_value[riga*dim_world+colonna],world_id[riga*dim_world+colonna]);
         }
         fprintf(file,"\n");
     }
-    // fprintf(file,"\n\n\n");
+     fprintf(file,"\n\n\n");
 
 }

@@ -49,13 +49,10 @@ __global__ void world_update_kernel(
     int *cells
 )
     {                 
-        // calcolo indice thread       
-        int center_x = blockIdx.x*blockDim.x + threadIdx.x;    
-        int center_y = blockIdx.y*blockDim.y + threadIdx.y;
-        int index = center_y * dim_world + center_x;
+        int index = blockIdx.x * blockDim.x + threadIdx.x;
         
         // se i thread superano la dim del mondo ritorno
-        if(center_x >= dim_world || center_y >= dim_world) return;
+        if(index >= dim_world*dim_world) return;
         
         // trovo ID e valore cella data la matrice degli id e indice cella mondo
         int ID = id_matrix[index];
@@ -150,6 +147,8 @@ __global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, in
         //ritorno i thread che eccedono il numero di cellule vive
         if(idx >= *cellCount) return;
 
+        int local_cellCount = *cellCount;
+        
         //inizializzo la maschera a 0 e temp cellule a 0 e alive a false
         mask_cu[idx] = 0;
         temp_cellule_cu[idx] = 0;
@@ -160,6 +159,9 @@ __global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, in
            mask_cu[idx] = 1; 
            mask_alive[idx] = true;
         }  
+
+        /*
+        
         //printf("ID_MATRIX: %d IDX: %d T: %d cell count: %d\n",id_matrix[cellule_cu[idx]],cellule_cu[idx],idx,*cellCount);
         // dichiaro un valore di parallelizzazione 32 è ottimale poicheè è la dimensione di un warp
         int dim_paral = 32;
@@ -182,16 +184,25 @@ __global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, in
             }    
         }    
         __syncthreads();
-    
+        
         if (id_sort_y != 0){
             mask_cu[index_sort] = mask_cu[index_sort] + mask_cu[id_sort_y*dim_paral - 1];
-        }    
+        } 
+        */
+       if (idx == 0){
+            int increment = 0;
+            for(int i = 0; i < local_cellCount; i++){
+                increment = increment + mask_cu[i];               
+                mask_cu[i] = increment;
+            }
+       }
+   
         __syncthreads();
     
         if (mask_alive[idx] == true){
             temp_cellule_cu[mask_cu[idx] - 1] = cellule_cu[idx];
         }     
-        int new_cellCount = mask_cu[*cellCount - 1];
+        int new_cellCount = mask_cu[local_cellCount - 1];
         if (idx > new_cellCount)return;
     
         cellule_cu[idx] = temp_cellule_cu[idx];  
@@ -232,14 +243,11 @@ void launch_world_update(
 ){
 
 
-    int n_thread_per_block = 1024;  
-    int thread_per_dimension = sqrt(n_thread_per_block);
-    int n_block = world_dim / thread_per_dimension;
-    if(n_block==0) n_block = 1;
-    dim3 thread_number = dim3(thread_per_dimension, thread_per_dimension);  
-    dim3 block_number = dim3(n_block, n_block); 
+    int n_thread_per_block = 1024; 
+    int thread_number = world_dim*world_dim;
+    int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
-    world_update_kernel<<<block_number,thread_number,0,stream>>>(
+    world_update_kernel<<<n_block,n_thread_per_block,0,stream>>>(
         world_value, 
         id_matrix,
         contribution_matrix,
