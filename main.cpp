@@ -14,7 +14,7 @@
 #include <format>
 
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
-const int world_dim = 100;
+const int world_dim = 300;
 const int n_creature = 5;
 const int n_layer = 5;
 int model_structure [n_layer] = {18, 1, 1, 1, 10};
@@ -35,6 +35,7 @@ int main(int argc, char* argv[]) {
     bool render = false;
     int numero_epoch = 1;
     int numero_step = 1;
+    int scale = 1;
     
     // Controlla se c'è almeno un argomento
     for (int i = 1; i < argc; ++i) {
@@ -48,6 +49,9 @@ int main(int argc, char* argv[]) {
         if(arg == "-st"){
             numero_step = std::atoi(argv[i+1]);
         }
+        if(arg == "-scale"){
+            scale = std::atoi(argv[i+1]);
+        }
     }
     
     //creazione finestra opengl
@@ -56,7 +60,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "Errore nell'inizializzazione di GLFW" << std::endl;
             return -1;
         }
-        window = glfwCreateWindow(world_dim, world_dim, "OpenGL Image Rendering", NULL, NULL);
+        window = glfwCreateWindow(world_dim*scale, world_dim*scale, "OpenGL Image Rendering", NULL, NULL);
     
         if (!window) {
             std::cerr << "Errore nella creazione della finestra" << std::endl;

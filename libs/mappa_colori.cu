@@ -46,11 +46,11 @@ void load_constant_memory_GPU() {
 }
 
 // Kernel per generare i colori corrispettivi dati mondo_value, monod_id, e l'output mondo_rgb
-__global__ void mappa_colori_kernel(float* mondo, int* id_matrix, float* mondo_rgb, int world_dim) {
+__global__ void mappa_colori_kernel(float* mondo, int* id_matrix, float* mondo_rgb, int thread_number) {
     
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (index >= world_dim) return;
+    if (index >= thread_number) return;
 
     int center_index = index / 3;
     int RGB_index = index % 3;
