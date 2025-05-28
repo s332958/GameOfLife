@@ -73,7 +73,8 @@ void simulazione(
     size_t tot_world_dim_size_float = sizeof(float) * world_dim * world_dim;
     size_t tot_world_dim_size_int = sizeof(int) * world_dim * world_dim;
     size_t tot_matrix_contribution_size = tot_world_dim_size_float * n_creature;
-    size_t tot_eval_vector_size = n_creature * sizeof(float);
+    size_t tot_energy_vector_size = n_creature * sizeof(float);
+    size_t tot_occupation_vector_size = n_creature * sizeof(int);
     size_t tot_models_weight_size = n_creature * n_weight * sizeof(float);
     size_t tot_models_bias_size = n_creature * n_bias * sizeof(float);
 
@@ -82,9 +83,9 @@ void simulazione(
     float *world_value_h       = (float*) malloc(tot_world_dim_size_float);    
     float *world_signal_h      = (float*) malloc(tot_world_dim_size_float);
     int   *world_id_h          = (int*)   malloc(tot_world_dim_size_int);
-    float *energy_vector_h     = (float*) malloc(tot_eval_vector_size);
-    int   *occupation_vector_h = (int*)   malloc(tot_eval_vector_size);
-    int   *creature_ordered_h  = (int*)   malloc(tot_eval_vector_size);
+    float *energy_vector_h     = (float*) malloc(tot_energy_vector_size);
+    int   *occupation_vector_h = (int*)   malloc(tot_occupation_vector_size);
+    int   *creature_ordered_h  = (int*)   malloc(tot_occupation_vector_size);
     int   *alive_cells_h       = (int*)   malloc(tot_world_dim_size_int);
     int   *n_cell_alive_h      ; //= (int*)   malloc(sizeof(int)); 
     
@@ -118,8 +119,8 @@ void simulazione(
     float *model_weights_d            = (float*) cuda_allocate(tot_models_weight_size, cc_major, 0);
     float *model_biases_d             = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);
     int   *alive_cells_d              = (int*)   cuda_allocate(tot_world_dim_size_int, cc_major, 0);
-    float *energy_vector_d            = (float*) cuda_allocate(tot_eval_vector_size, cc_major, 0);
-    int   *occupation_vector_d        = (int*)   cuda_allocate(tot_eval_vector_size, cc_major, 0);
+    float *energy_vector_d            = (float*) cuda_allocate(tot_energy_vector_size, cc_major, 0);
+    int   *occupation_vector_d        = (int*)   cuda_allocate(tot_occupation_vector_size, cc_major, 0);
     float *new_model_weights_d        = (float*) cuda_allocate(tot_models_weight_size, cc_major, 0);
     float *new_model_biases_d         = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);    
     int   *n_cell_alive_d             ; // = (int*)   cuda_allocate(sizeof(int), cc_major, 0);
@@ -348,8 +349,7 @@ void simulazione(
                     );
 
                     offset_alive_cell++;
-                    //printf("CELLULE FINO A %d \n",offset_alive_cell);
-
+                    
                 }
 
                 // Aspetto che tutti i kernel del batch finiscano prima di riutilizzare i workspace
@@ -465,10 +465,10 @@ void simulazione(
         int limit = n_creature * 0.4f;
 
         // - spostamento vettore energia su HOST
-        cuda_memcpy(energy_vector_h,energy_vector_d,tot_eval_vector_size,cudaMemcpyDeviceToHost,cc_major, streams[0]);
+        cuda_memcpy(energy_vector_h,energy_vector_d,tot_energy_vector_size,cudaMemcpyDeviceToHost,cc_major, streams[0]);
         CUDA_CHECK(cudaGetLastError());
         // - spostamento vettore occupazione su HOST
-        cuda_memcpy(occupation_vector_h,occupation_vector_d,tot_eval_vector_size,cudaMemcpyDeviceToHost,cc_major, streams[0]);
+        cuda_memcpy(occupation_vector_h,occupation_vector_d,tot_occupation_vector_size,cudaMemcpyDeviceToHost,cc_major, streams[0]);
         CUDA_CHECK(cudaGetLastError());
 
         // - Ordinamento punteggi creature

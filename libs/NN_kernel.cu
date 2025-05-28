@@ -205,21 +205,16 @@ __global__ void compute_energy_and_occupation_kernel(
     int world_dim,
     int n_creature) {
 
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int index = blockDim.x * blockIdx.x + threadIdx.x;
 
-    if (x >= world_dim || y >= world_dim) return;
+    if (index >= world_dim * world_dim) return;
 
-    int idx = x + y*world_dim;
+    int id = world_id[index] - 1;
+
+    if (id < 0)return;
     
-    // index on vectors valuation
-    int id = world_id[idx] -1;
-
-    if (id >= 0 && id < n_creature) {
-        // Accesso atomico per evitare race condition
-        atomicAdd(&occupation_vector[id], 1);
-        atomicAdd(&energy_vector[id], world_value[idx]);
-    }
+    atomicAdd(&occupation_vector[id], 1);
+    atomicAdd(&energy_vector[id], world_value[index]);
 
 }
 
@@ -351,9 +346,9 @@ void launch_NN_forward(                                     // Testata e funzion
         layer1_size = structure[i];
         layer2_size = structure[i + 1];
 
-        int thread_number = layer1_size * layer2_size;        
-        int n_block = thread_number / n_thread_per_block;
-        if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1;      
+        int thread_number = layer1_size * layer2_size;             
+
+        int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
         if(i == (structureLenght-2)){
             NN_forward_kernel<<<n_block, n_thread_per_block, 0 , stream>>>(
@@ -422,8 +417,7 @@ void launch_output_elaboration(                                 // Funziona e te
 ){
     int n_thread_per_block = 1024;
     int thread_number = output_size;
-    int n_block = thread_number / n_thread_per_block;
-    if(n_block%n_thread_per_block!=0 || n_block==0)n_block=n_block+1; 
+    int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
     output_elaboration_kernel<<<n_block, n_thread_per_block, 0, stream>>>(
         world_value,
@@ -455,12 +449,12 @@ void launch_compute_energy_and_occupation(
     cudaStream_t stream
 ){
 
-    int n_thread = 32;
-    int n_block = (world_dim + n_thread -1) / n_thread;
-    dim3 dim_block(n_thread,n_thread);
-    dim3 dim_grid(n_block,n_block);
+    int n_thread_per_block = 1024; 
+    int thread_number = world_dim * world_dim;
 
-    compute_energy_and_occupation_kernel<<<dim_grid,dim_block,0,stream>>>(
+    int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
+
+    compute_energy_and_occupation_kernel<<<n_block,n_thread_per_block,0,stream>>>(
         world_value,
         world_id,
         occupation_vector,
