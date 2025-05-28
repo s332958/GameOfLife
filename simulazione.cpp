@@ -296,7 +296,7 @@ void simulazione(
 
                 int max = n_workspace<*n_cell_alive_h?n_workspace:*n_cell_alive_h;
 
-                for(int workspace_idx=0; workspace_idx<max; workspace_idx++){
+                for(int workspace_idx=0; workspace_idx<max && offset_alive_cell<*n_cell_alive_h; workspace_idx++){
 
                     int offset_workspace_in = input_size*workspace_idx;
                     int offset_workspace_out = output_size*workspace_idx;
@@ -312,6 +312,8 @@ void simulazione(
                         workspace_input_d+offset_workspace_in,
                         streams[stream_id]
                     );
+
+                    //printf("stream_id:%d  workspace:%d  cellula:%d  \n",stream_id, workspace_idx, offset_alive_cell);
 
                     // printf("INPUT_WORKSPACE:   %p \n",workspace_input_d);
                     // printf("MODEL_WEIGHTS:     %p \n",model_weights_d);
