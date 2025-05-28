@@ -202,7 +202,7 @@ __global__ void output_elaboration_kernel(
 __global__ void compute_energy_and_occupation_kernel(
     float* world_value,
     int* world_id,
-    int* occupation_vector,
+    float* occupation_vector,
     float* energy_vector,
     int world_dim,
     int n_creature) {
@@ -215,7 +215,7 @@ __global__ void compute_energy_and_occupation_kernel(
 
     if (id < 0)return;
     
-    atomicAdd(&occupation_vector[id], 1);
+    atomicAdd(&occupation_vector[id], 1.0f/float(world_dim));
     atomicAdd(&energy_vector[id], world_value[index]);
 
 }
@@ -444,7 +444,7 @@ void launch_output_elaboration(                                 // Funziona e te
 void launch_compute_energy_and_occupation(
     float* world_value,
     int* world_id,
-    int* occupation_vector,
+    float* occupation_vector,
     float* energy_vector,
     int world_dim,
     int n_creature,

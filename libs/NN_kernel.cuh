@@ -46,7 +46,7 @@ void launch_output_elaboration(
 void launch_compute_energy_and_occupation(
     float* world_value,
     int* world_id,
-    int* occupation_vector,
+    float* occupation_vector,
     float* energy_vector,
     int world_dim,
     int n_creature,

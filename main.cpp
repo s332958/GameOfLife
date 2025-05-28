@@ -20,7 +20,7 @@ const int n_layer = 5;
 int model_structure [n_layer] = {18, 1, 1, 1, 10};
 float * weights_models = nullptr; 
 float * biases_models = nullptr; 
-int const METHOD_EVAL = 0;
+int const METHOD_EVAL = 1;
 
 size_t reserve_free_memory = 1024 * 1024 * 300; // * 1024;// 1GB
 int const MAX_WORKSPACE = 50;
@@ -31,6 +31,10 @@ GLFWwindow* window;
 GLuint textureID;
 
 int main(int argc, char* argv[]) {
+
+    // dipendenza temporale ai valori randomici in CPU
+    srand(time(0));
+
     clock_t start = clock();  // Start time 
     bool render = false;
     int numero_epoch = 1;

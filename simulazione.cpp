@@ -84,7 +84,7 @@ void simulazione(
     float *world_signal_h      = (float*) malloc(tot_world_dim_size_float);
     int   *world_id_h          = (int*)   malloc(tot_world_dim_size_int);
     float *energy_vector_h     = (float*) malloc(tot_energy_vector_size);
-    int   *occupation_vector_h = (int*)   malloc(tot_occupation_vector_size);
+    float *occupation_vector_h = (float*) malloc(tot_occupation_vector_size);
     int   *creature_ordered_h  = (int*)   malloc(tot_occupation_vector_size);
     int   *alive_cells_h       = (int*)   malloc(tot_world_dim_size_int);
     int   *n_cell_alive_h      ; //= (int*)   malloc(sizeof(int)); 
@@ -120,7 +120,7 @@ void simulazione(
     float *model_biases_d             = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);
     int   *alive_cells_d              = (int*)   cuda_allocate(tot_world_dim_size_int, cc_major, 0);
     float *energy_vector_d            = (float*) cuda_allocate(tot_energy_vector_size, cc_major, 0);
-    int   *occupation_vector_d        = (int*)   cuda_allocate(tot_occupation_vector_size, cc_major, 0);
+    float *occupation_vector_d        = (float*) cuda_allocate(tot_occupation_vector_size, cc_major, 0);
     float *new_model_weights_d        = (float*) cuda_allocate(tot_models_weight_size, cc_major, 0);
     float *new_model_biases_d         = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);    
     int   *n_cell_alive_d             ; // = (int*)   cuda_allocate(sizeof(int), cc_major, 0);
@@ -205,7 +205,7 @@ void simulazione(
         // - Azzeramento vettore valutazione x occupazione ed energia
         launch_reset_kernel<float>(energy_vector_d, n_creature, streams[0]);
         CUDA_CHECK(cudaGetLastError());
-        launch_reset_kernel<int>(occupation_vector_d, n_creature, streams[0]);
+        launch_reset_kernel<float>(occupation_vector_d, n_creature, streams[0]);
         CUDA_CHECK(cudaGetLastError());
 
         printf("RESET ALL MATRIX \n");    
@@ -478,7 +478,7 @@ void simulazione(
         if(METHOD_EVAL==1) argsort_bubble(occupation_vector_h,creature_ordered_h,n_creature);
 
         printf("-----------------------------PUNTEGGI CREATURE----------------------\n");
-        for(int i=0; i<n_creature; i++) printf("%3d) energy: %f occupation: %d\n",i+1,energy_vector_h[i],occupation_vector_h[i]);
+        for(int i=0; i<n_creature; i++) printf("%3d) energy: %.6f occupation: %.6f\n",i+1,energy_vector_h[i],occupation_vector_h[i]);
         printf("-----------------------------END PUNTEGGI CREATURE----------------------\n");
         printf("CREATURE ORDER, LIMIT(%d): \n",limit);
         for(int i=0; i<n_creature; i++) printf("%3d ",creature_ordered_h[i]+1);
