@@ -24,12 +24,6 @@ void simulazione(
     GLFWwindow* window, GLuint textureID
 ) {
 
-
-
-
-    FILE *file = fopen("output.txt","w");
-    fprintf(file,"%d\n",world_dim);
-
     int input_size = model_structure[0];
     int output_size = model_structure[n_layer-1];
 
@@ -250,8 +244,9 @@ void simulazione(
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, streams[0]);
         CUDA_CHECK(cudaGetLastError());
         */
+        
         // - Aggiunta cibo al mondo
-        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.85f, streams[0]);
+        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.96f, streams[0]);
         CUDA_CHECK(cudaGetLastError());
         
         // - Ritorno mondo valori e mondo id definitivi su CPU per debug 
@@ -259,10 +254,6 @@ void simulazione(
         CUDA_CHECK(cudaGetLastError());
         cuda_memcpy(world_id_h, world_id_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
         CUDA_CHECK(cudaGetLastError());
-
-        // - salvataggio mappa debug
-        save_map(file,world_dim,world_value_h,world_id_h);
-        printf("RETURN VIEW WORLD SETUP\n");
 
         cudaDeviceSynchronize();
 
@@ -289,6 +280,7 @@ void simulazione(
             launch_reset_kernel<float>(world_contributions_d, world_dim * world_dim * n_creature, streams[0]);
             CUDA_CHECK(cudaGetLastError());
             launch_reset_kernel<float>(workspace_input_d, n_workspace*input_size, streams[0]);
+            CUDA_CHECK(cudaGetLastError());
 
             //inizializzo l'offset per le cellule per trovare la corrispettiva stazione di lavoro
             int offset_alive_cell = 0;
@@ -312,14 +304,8 @@ void simulazione(
                         workspace_input_d+offset_workspace_in,
                         streams[stream_id]
                     );
+                    CUDA_CHECK(cudaGetLastError());
 
-                    //printf("stream_id:%d  workspace:%d  cellula:%d  \n",stream_id, workspace_idx, offset_alive_cell);
-
-                    // printf("INPUT_WORKSPACE:   %p \n",workspace_input_d);
-                    // printf("MODEL_WEIGHTS:     %p \n",model_weights_d);
-                    // printf("MODEL_BIASES:      %p \n",model_biases_d);
-                    // printf("ALIVE_CELLS:       %p \n",alive_cells_d);
-                    // printf("")
 
                     launch_NN_forward(
                         workspace_input_d+offset_workspace_in,
@@ -335,6 +321,7 @@ void simulazione(
                         n_layer,
                         streams[stream_id]
                     );
+                    CUDA_CHECK(cudaGetLastError());
 
                     launch_output_elaboration(
                         world_value_d,
@@ -349,6 +336,7 @@ void simulazione(
                         offset_alive_cell,
                         streams[stream_id]
                     );
+                    CUDA_CHECK(cudaGetLastError());
 
                     offset_alive_cell++;
                     
@@ -362,7 +350,6 @@ void simulazione(
 
             }
             
-            cudaDeviceSynchronize();
             launch_world_update(
                 world_value_d,
                 world_id_d,
@@ -373,7 +360,7 @@ void simulazione(
                 n_cell_alive_d,
                 streams[0]
             );
-            cudaDeviceSynchronize();
+            CUDA_CHECK(cudaGetLastError());
 
             launch_find_index_cell_alive(
                 world_id_d,
@@ -391,6 +378,7 @@ void simulazione(
             if(render){
 
                 launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, streams[0]);
+                CUDA_CHECK(cudaGetLastError());
                 
                 cudaMemcpy(world_rgb_h, world_rgb_d, tot_world_dim_size_float * 3, cudaMemcpyDeviceToHost);
 
@@ -414,18 +402,7 @@ void simulazione(
                 glfwSwapBuffers(window);
 
                 // Gestione degli eventi
-                glfwPollEvents();
-                /*
-                std::cout << "\n=== RGB MATRIX===\n";
-                
-                for (int y = 0; y < world_dim; y++) {
-                    for (int x = 0; x < world_dim; x++) {
-                        printf("%.4f ", world_rgb_h[(y * world_dim + x)*3]);
-                    }
-                    std::cout << "\n";
-                }
-                */
-                
+                glfwPollEvents();              
 
             } 
 
@@ -433,6 +410,7 @@ void simulazione(
             launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature,streams[0]);
             CUDA_CHECK(cudaGetLastError());
 
+            /*
             // - ritorno i valori per debug di fatto non serve siccome gia lavoro sulla GPU
             // - Ritorno mondo valori
             cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, streams[0]);
@@ -441,12 +419,12 @@ void simulazione(
             cuda_memcpy(world_id_h, world_id_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
             CUDA_CHECK(cudaGetLastError());  
             
-            /*
+            
+            
+            
             // - Ritorno alive_cell_d
             cuda_memcpy(alive_cells_h, alive_cells_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
             CUDA_CHECK(cudaGetLastError());   
-            
-            
             std::cout << "\n=== ALIVE CELLS ===\n";
             for (int i = 0; i < *n_cell_alive_h; i++) {
                 std::cout << "Alive[" << i << "] = " << alive_cells_h[i] << "\n";
@@ -454,12 +432,6 @@ void simulazione(
 
             }
             */
-            
-
-            // salvo il mondo per debug 
-            save_map(file,world_dim,world_value_h,world_id_h);
-
-            printf("RETURN VIEW WORLD %d.%d \n",epoca,step);
 
         }
 
@@ -580,8 +552,6 @@ void simulazione(
     
 
     for(int i=0; i<n_stream; i++) cudaStreamDestroy(streams[i]);
-
-    fclose(file);
 
     std::cout << "End Simulation. \n";
 }

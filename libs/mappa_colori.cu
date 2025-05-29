@@ -65,7 +65,7 @@ __global__ void mappa_colori_kernel(float* mondo, int* id_matrix, float* mondo_r
         mondo_rgb[out_index] = value;  // scala di grigi
     }
     else if (ID >= 1 && ID <= 20) {
-        mondo_rgb[out_index] = COLORI[ID][channel] * value * 4;
+        mondo_rgb[out_index] = COLORI[ID][channel] * (value + 0.05) * 5;
     }
     else {
         mondo_rgb[out_index] = 0.0f;

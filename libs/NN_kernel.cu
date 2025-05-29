@@ -183,7 +183,7 @@ __global__ void output_elaboration_kernel(
     int filter_index = (world_dim * world_dim * (ID - 1)) + (filter_y * world_dim) + filter_x;
 
     // indico un max di quanto ogni cella puo donare del suo valore max
-    float frazione_di_se_stesso = 1.0/9.0;
+    float frazione_di_se_stesso = 1.0/18.0;
 
     // calcolo il valore finale da mettere nella cella dei contributi
     float final_output = center_value * frazione_di_se_stesso * output;

@@ -14,16 +14,16 @@
 #include <format>
 
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
-const int world_dim = 400;
-const int n_creature = 10;
+const int world_dim = 300;
+const int n_creature = 20;
 const int n_layer = 5;
-int model_structure [n_layer] = {18, 1, 1, 1, 10};
+int model_structure [n_layer] = {162, 50, 50, 50, 10};
 float * weights_models = nullptr; 
 float * biases_models = nullptr; 
 int const METHOD_EVAL = 1;
 
 size_t reserve_free_memory = 1024 * 1024 * 300; // * 1024;// 1GB
-int const MAX_WORKSPACE = 10;
+int const MAX_WORKSPACE = 10000;
 
 const int MAX_CREATURE = 64;
 
