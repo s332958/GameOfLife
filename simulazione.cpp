@@ -252,6 +252,10 @@ void simulazione(
         // - Aggiunta ostacoli al mondo
         // launch_perlinNoise_obstacles(world_dim, world_id_d, 0);
         CUDA_CHECK(cudaGetLastError());
+        
+        // - Aggiunta ostacoli al mondo
+        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, 0);
+        CUDA_CHECK(cudaGetLastError());   
 
         // - Aggiunta cibo al mondo
         launch_perlinNoise_food(world_dim, world_id_d, world_value_d, 0);
@@ -261,9 +265,6 @@ void simulazione(
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.99f, 0);
         CUDA_CHECK(cudaGetLastError());
         /*
-        // - Aggiunta ostacoli al mondo
-        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, 0);
-        CUDA_CHECK(cudaGetLastError());   
         // - Ritorno mondo valori e mondo id definitivi su CPU per debug         
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, streams[0]);
         CUDA_CHECK(cudaGetLastError());
@@ -368,7 +369,6 @@ void simulazione(
             launch_world_update(
                 world_value_d,
                 world_id_d,
-                world_signal_d,
                 world_contributions_d,
                 alive_cells_d,
                 world_dim,
