@@ -250,12 +250,12 @@ void simulazione(
         CUDA_CHECK(cudaGetLastError());
 
         // - Aggiunta ostacoli al mondo
-        // launch_perlinNoise_obstacles(world_dim, world_id_d, 0);
+        launch_perlinNoise_obstacles(world_dim, world_id_d, 0);
         CUDA_CHECK(cudaGetLastError());
         
-        // - Aggiunta ostacoli al mondo
-        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, 0);
-        CUDA_CHECK(cudaGetLastError());   
+        // - Aggiunta ostacoli random al mondo
+        // launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, 0);
+        // CUDA_CHECK(cudaGetLastError());   
 
         // - Aggiunta cibo al mondo
         launch_perlinNoise_food(world_dim, world_id_d, world_value_d, 0);

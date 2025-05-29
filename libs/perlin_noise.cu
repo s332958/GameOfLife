@@ -72,7 +72,7 @@ __global__ void perlinNoise_obstacles_kernel(int world_dim, int* world_id_d, flo
 
     float val = perlin(nx, ny);
     val = (val + 1.0f) * 0.5f;
-    if  (world_id_d[index] > 0 && val < threshold) return;
+    if  (world_id_d[index] > 0 || val < threshold) return;
 
     world_id_d[index] = -1;
 }
@@ -99,7 +99,7 @@ void launch_perlinNoise_obstacles(int world_dim, int* world_id_d, cudaStream_t s
     dim3 blockSize(16, 16);
     dim3 gridSize((world_dim + 15) / 16, (world_dim + 15) / 16);
 
-    float scale = 20.0f;         // dimensione "in pixel" delle strutture
+    float scale = 10.0f;         // dimensione "in pixel" delle strutture
     float threshold = 0.85f;     // soglia per decidere gli ostacoli
 
     // Offset casuale basato su clock
