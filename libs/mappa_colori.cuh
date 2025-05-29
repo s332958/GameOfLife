@@ -9,4 +9,7 @@ void load_constant_memory_GPU(int n_creature);
 // Funzione che lancia il kernel di color mapping
 void launch_mappa_colori(float* mondo, int* id_matrix, float* mondo_rgb_d, int world_dim, cudaStream_t stream);
 
+
+void launch_mappa_signal(float* mondo, int* id_matrix, float* mondo_signal, float* mondo_rgb_d, int world_dim, int n_creature, cudaStream_t stream);
+
 extern __constant__ float COLORI[100][3];

@@ -1,4 +1,29 @@
-// Perlin noise – versione semplificata per CUDA
+#include "perlin_noise.cuh"
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+#include <math.h>
+#include <ctime>
+
+// Permutazione classica
+__device__ int perm[256] = {
+    151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,
+    140,36,103,30,69,142,8,99,37,240,21,10,23,190,6,148,
+    247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,
+    57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,
+    74,165,71,134,139,48,27,166,77,146,158,231,83,111,229,122,
+    60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54,
+    65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,
+    200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,
+    52,217,226,250,124,123,5,202,38,147,118,126,255,82,85,212,
+    207,206,59,227,47,16,58,17,182,189,28,42,223,183,170,213,
+    119,248,152,2,44,154,163,70,221,153,101,155,167,43,172,9,
+    129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,
+    218,246,97,228,251,34,242,193,238,210,144,12,191,179,162,241,
+    81,51,145,235,249,14,239,107,49,192,214,31,181,199,106,157,
+    184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,
+    222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
+};
+
 __device__ float fade(float t) {
     return t * t * t * (t * (t * 6 - 15) + 10);
 }
@@ -14,13 +39,6 @@ __device__ float grad(int hash, float x, float y) {
     return ((h & 1) ? -u : u) + ((h & 2) ? -2.0f * v : 2.0f * v);
 }
 
-__device__ int perm[256] = {
-    151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,
-    140,36,103,30,69,142,8,99,37,240,21,10,23,151,160,137,
-    91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,
-    30,69,142,8,99,37,240,21,10,23, /* ...ripeti fino a 256 elementi */
-};
-
 __device__ float perlin(float x, float y) {
     int X = (int)floorf(x) & 255;
     int Y = (int)floorf(y) & 255;
@@ -34,52 +52,74 @@ __device__ float perlin(float x, float y) {
     int A = perm[X] + Y;
     int B = perm[X + 1] + Y;
 
-    return lerp(
-        lerp(grad(perm[A], x, y), grad(perm[B], x - 1, y), u),
-        lerp(grad(perm[A + 1], x, y - 1), grad(perm[B + 1], x - 1, y - 1), u),
-        v
-    );
+    float x1 = lerp(grad(perm[A], x, y), grad(perm[B], x - 1, y), u);
+    float x2 = lerp(grad(perm[A + 1], x, y - 1), grad(perm[B + 1], x - 1, y - 1), u);
+
+    return lerp(x1, x2, v);
 }
 
-// Kernel: applica il Perlin noise + soglia
-__global__ void perlinNoiseThreshold_kernel(
-    int* world_id_d, int world_dim,
-    float scale, float threshold,
-    float* offset_x, float* offset_y)
-{
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int total = world_dim * world_dim;
-    if (idx >= total) return;
+__global__ void perlinNoise_obstacles_kernel(int world_dim, int* world_id_d, float scale, float threshold, float x_offset, float y_offset) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    int x = idx % world_dim;
-    int y = idx / world_dim;
+    if (x >= world_dim || y >= world_dim) return;
 
-    float nx = (x + offset_x) * scale;
-    float ny = (y + offset_y) * scale;
+    int index = y * world_dim + x;
 
-    float noise = perlin(nx, ny);
-    noise = (noise + 1.0f) * 0.5f; // normalizza tra 0 e 1
+    float nx = (x + x_offset) / scale;
+    float ny = (y + y_offset) / scale;
 
-    world_id_d[idx] = (noise > threshold) ? -1 : 0;
+    float val = perlin(nx, ny);
+    val = (val + 1.0f) * 0.5f;
+    if  (world_id_d[index] > 0) return;
+    if (val < threshold) return;
 
-
+    world_id_d[index] = -1;
 }
 
-int* d_world;
-int world_dim = 128;
+__global__ void perlinNoise_food_kernel(int world_dim, int* world_id_d, float* world_d, float scale, float threshold, float x_offset, float y_offset) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-void perlinNoiseThreshold(int world_dim, 
-    int* world_id_d, int num_creature){
-        float scale = 0.05f;
-        float threshold = 0.55f;
-        int total = world_dim * world_dim;
-        float offset_x = rand() % 10000;
-        float offset_y = rand() % 10000;
-            
-        int threads = 256;
-        int blocks = (total + threads - 1) / threads;
-        
-        perlinNoiseThreshold_kernel<<<blocks, threads>>>(world_id_d, world_dim, scale, threshold, offset_x, offset_y);
-        cudaDeviceSynchronize();
+    if (x >= world_dim || y >= world_dim) return;
 
-    }
+    int index = y * world_dim + x;
+
+    float nx = (x + x_offset) / scale;
+    float ny = (y + y_offset) / scale;
+
+    float val = perlin(nx, ny);
+    val = (val + 1.0f) * 0.5f;
+    if  (world_id_d[index] != 0) return;
+    if (val < threshold) return;
+
+    world_d[index] = val;
+}
+
+void launch_perlinNoise_obstacles(int world_dim, int* world_id_d) {
+    dim3 blockSize(16, 16);
+    dim3 gridSize((world_dim + 15) / 16, (world_dim + 15) / 16);
+
+    float scale = 20.0f;         // dimensione "in pixel" delle strutture
+    float threshold = 0.85f;     // soglia per decidere gli ostacoli
+
+    // Offset casuale basato su clock
+    float x_offset = (float)(clock() % 10000);
+    float y_offset = (float)((clock() * 31) % 10000);
+
+    perlinNoise_obstacles_kernel<<<gridSize, blockSize>>>(world_dim, world_id_d, scale, threshold, x_offset, y_offset);
+}
+
+void launch_perlinNoise_food(int world_dim, int* world_id_d, float* world_d) {
+    dim3 blockSize(16, 16);
+    dim3 gridSize((world_dim + 15) / 16, (world_dim + 15) / 16);
+
+    float scale = 8.0f;         // dimensione "in pixel" delle strutture
+    float threshold = 0.90f;     // soglia per decidere gli ostacoli
+
+    // Offset casuale basato su clock
+    float x_offset = (float)(clock() % 10000);
+    float y_offset = (float)((clock() * 31) % 10000);
+
+    perlinNoise_food_kernel<<<gridSize, blockSize>>>(world_dim, world_id_d, world_d, scale, threshold, x_offset, y_offset);
+}

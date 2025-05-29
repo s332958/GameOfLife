@@ -4,6 +4,7 @@
 #include "libs/NN_kernel.cuh"
 #include "libs/utils_kernel.cuh"
 #include "libs/utils_cpu.h"
+#include "libs/perlin_noise.cuh"
 
 #include <GLFW/glfw3.h>
 
@@ -248,16 +249,22 @@ void simulazione(
         cuda_memcpy(alive_cells_d, alive_cells_h, tot_world_dim_size_int, cudaMemcpyHostToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
+
+        launch_perlinNoise_obstacles(world_dim, world_id_d);
+        CUDA_CHECK(cudaGetLastError());
+
+        // - Aggiunta cibo al mondo
+        launch_perlinNoise_food(world_dim, world_id_d, world_value_d);
+        CUDA_CHECK(cudaGetLastError());
+
+        // - Aggiunta cibo al mondo
+        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.99f, 0);
+        CUDA_CHECK(cudaGetLastError());
+        /*
         // - Aggiunta ostacoli al mondo
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, 0);
-        CUDA_CHECK(cudaGetLastError());
-        
-        // - Aggiunta cibo al mondo
-        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.96f, 0);
-        CUDA_CHECK(cudaGetLastError());
-        
-        // - Ritorno mondo valori e mondo id definitivi su CPU per debug 
-        /*
+        CUDA_CHECK(cudaGetLastError());   
+        // - Ritorno mondo valori e mondo id definitivi su CPU per debug         
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, streams[0]);
         CUDA_CHECK(cudaGetLastError());
         cuda_memcpy(world_id_h, world_id_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
@@ -383,9 +390,12 @@ void simulazione(
             // se il render è attivo genero la schermata con openGL
             if(render){
 
-                launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, 0);
+                //launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, 0);
+                //CUDA_CHECK(cudaGetLastError());
+
+                launch_mappa_signal(world_value_d, world_id_d, world_signal_d, world_rgb_d, world_dim, n_creature, 0);
                 CUDA_CHECK(cudaGetLastError());
-                
+
                 cudaMemcpy(world_rgb_h, world_rgb_d, tot_world_dim_size_float * 3, cudaMemcpyDeviceToHost);
 
                 // Carica i dati nella texture OpenGL
