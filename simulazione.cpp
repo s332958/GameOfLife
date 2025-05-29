@@ -249,12 +249,12 @@ void simulazione(
         cuda_memcpy(alive_cells_d, alive_cells_h, tot_world_dim_size_int, cudaMemcpyHostToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
-
-        launch_perlinNoise_obstacles(world_dim, world_id_d);
+        // - Aggiunta ostacoli al mondo
+        // launch_perlinNoise_obstacles(world_dim, world_id_d, 0);
         CUDA_CHECK(cudaGetLastError());
 
         // - Aggiunta cibo al mondo
-        launch_perlinNoise_food(world_dim, world_id_d, world_value_d);
+        launch_perlinNoise_food(world_dim, world_id_d, world_value_d, 0);
         CUDA_CHECK(cudaGetLastError());
 
         // - Aggiunta cibo al mondo

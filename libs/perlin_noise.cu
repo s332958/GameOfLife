@@ -3,6 +3,7 @@
 #include <device_launch_parameters.h>
 #include <math.h>
 #include <ctime>
+#include <iostream>
 
 // Permutazione classica
 __device__ int perm[256] = {
@@ -40,8 +41,8 @@ __device__ float grad(int hash, float x, float y) {
 }
 
 __device__ float perlin(float x, float y) {
-    int X = (int)floorf(x) & 255;
-    int Y = (int)floorf(y) & 255;
+    int X = (int)floorf(x) & 254;
+    int Y = (int)floorf(y) & 254;
 
     x -= floorf(x);
     y -= floorf(y);
@@ -49,8 +50,8 @@ __device__ float perlin(float x, float y) {
     float u = fade(x);
     float v = fade(y);
 
-    int A = perm[X] + Y;
-    int B = perm[X + 1] + Y;
+    int A = (perm[X] + Y) & 254;
+    int B = (perm[X + 1] + Y) & 254;
 
     float x1 = lerp(grad(perm[A], x, y), grad(perm[B], x - 1, y), u);
     float x2 = lerp(grad(perm[A + 1], x, y - 1), grad(perm[B + 1], x - 1, y - 1), u);
@@ -71,8 +72,7 @@ __global__ void perlinNoise_obstacles_kernel(int world_dim, int* world_id_d, flo
 
     float val = perlin(nx, ny);
     val = (val + 1.0f) * 0.5f;
-    if  (world_id_d[index] > 0) return;
-    if (val < threshold) return;
+    if  (world_id_d[index] > 0 && val < threshold) return;
 
     world_id_d[index] = -1;
 }
@@ -90,13 +90,12 @@ __global__ void perlinNoise_food_kernel(int world_dim, int* world_id_d, float* w
 
     float val = perlin(nx, ny);
     val = (val + 1.0f) * 0.5f;
-    if  (world_id_d[index] != 0) return;
-    if (val < threshold) return;
+    if  (world_id_d[index] != 0 || val < threshold) return;
 
     world_d[index] = val;
 }
 
-void launch_perlinNoise_obstacles(int world_dim, int* world_id_d) {
+void launch_perlinNoise_obstacles(int world_dim, int* world_id_d, cudaStream_t stream) {
     dim3 blockSize(16, 16);
     dim3 gridSize((world_dim + 15) / 16, (world_dim + 15) / 16);
 
@@ -107,19 +106,19 @@ void launch_perlinNoise_obstacles(int world_dim, int* world_id_d) {
     float x_offset = (float)(clock() % 10000);
     float y_offset = (float)((clock() * 31) % 10000);
 
-    perlinNoise_obstacles_kernel<<<gridSize, blockSize>>>(world_dim, world_id_d, scale, threshold, x_offset, y_offset);
+    perlinNoise_obstacles_kernel<<<gridSize, blockSize, 0, stream>>>(world_dim, world_id_d, scale, threshold, x_offset, y_offset);
 }
 
-void launch_perlinNoise_food(int world_dim, int* world_id_d, float* world_d) {
+void launch_perlinNoise_food(int world_dim, int* world_id_d, float* world_d, cudaStream_t stream) {
     dim3 blockSize(16, 16);
     dim3 gridSize((world_dim + 15) / 16, (world_dim + 15) / 16);
 
-    float scale = 8.0f;         // dimensione "in pixel" delle strutture
+    float scale = 8.0f;          // dimensione "in pixel" delle strutture
     float threshold = 0.90f;     // soglia per decidere gli ostacoli
 
     // Offset casuale basato su clock
     float x_offset = (float)(clock() % 10000);
     float y_offset = (float)((clock() * 31) % 10000);
 
-    perlinNoise_food_kernel<<<gridSize, blockSize>>>(world_dim, world_id_d, world_d, scale, threshold, x_offset, y_offset);
+    perlinNoise_food_kernel<<<gridSize, blockSize, 0, stream>>>(world_dim, world_id_d, world_d, scale, threshold, x_offset, y_offset);
 }

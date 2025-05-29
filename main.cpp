@@ -15,7 +15,7 @@
 
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
 const int n_layer = 5;
-int model_structure [n_layer] = {388, 100, 100, 100, 10};
+int model_structure [n_layer] = {162, 50, 25, 20, 10};
 float * weights_models = nullptr; 
 float * biases_models = nullptr; 
 
@@ -33,8 +33,8 @@ int main(int argc, char* argv[]) {
 
     clock_t start = clock();  // Start time 
     bool render = false;
-    int numero_epoch = 1;
-    int numero_step = 1;
+    int numero_epoch = 4;
+    int numero_step = 100;
     int scale = 1;
     int world_dim = 400;
     int n_creature = 40;
