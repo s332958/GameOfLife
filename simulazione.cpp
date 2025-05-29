@@ -81,12 +81,12 @@ void simulazione(
     float *occupation_vector_h = (float*) malloc(tot_occupation_vector_size);
     int   *creature_ordered_h  = (int*)   malloc(tot_occupation_vector_size);
     int   *alive_cells_h       = (int*)   malloc(tot_world_dim_size_int);
-    int   *n_cell_alive_h      ; //= (int*)   malloc(sizeof(int)); 
-    
-    // Siccome n_alive_cell è solo un int e viene passato spesso lo alloco nella memoria pinnata della RAM che viene condivsa con la GPU
-    cudaHostAlloc((void**)&n_cell_alive_h, sizeof(int), cudaHostAllocMapped);
+    int   *n_cell_alive_h      ; 
     float *model_weights_h     = nullptr;
     float *model_biases_h      = nullptr;
+
+    // Siccome n_alive_cell è solo un int e viene passato spesso lo alloco nella memoria pinnata della RAM che viene condivsa con la GPU
+    cudaHostAlloc((void**)&n_cell_alive_h, sizeof(int), cudaHostAllocMapped);
 
     if(weights_models==nullptr) model_weights_h = (float*) malloc(tot_models_weight_size);
     else model_weights_h       = weights_models;
@@ -117,17 +117,28 @@ void simulazione(
     float *occupation_vector_d        = (float*) cuda_allocate(tot_occupation_vector_size, cc_major, 0);
     float *new_model_weights_d        = (float*) cuda_allocate(tot_models_weight_size, cc_major, 0);
     float *new_model_biases_d         = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);    
-    int   *n_cell_alive_d             ; // = (int*)   cuda_allocate(sizeof(int), cc_major, 0);
+    int   *n_cell_alive_d             ; 
     cudaHostGetDevicePointer(&n_cell_alive_d, n_cell_alive_h , 0);
 
+    // Find max dim layer
+    int i_max = 0;
+    for(int i=0; i<n_layer; i++){
+        if(model_structure[i]>model_structure[i_max]){
+            i_max = i;
+        }
+    }
+    
     // Calcolo spazio massimo disponibile per workspace
+    int dim_max_layer = model_structure[i_max];
     int dim_input = model_structure[0];
     int dim_output = model_structure[n_layer - 1];
-    size_t dim_workspace = dim_input  * sizeof(float);
-    computeFreeMemory(&free_mem);
+    size_t dim_workspace = dim_max_layer  * sizeof(float);
 
+    // compute n_workspace using all free memory avaible
+    computeFreeMemory(&free_mem);
     int n_workspace = (free_mem > reserve_free_memory) ? (free_mem - reserve_free_memory) / dim_workspace : 0;
 
+    // if are not allocate workspace return error
     if (n_workspace == 0) {
         throw std::runtime_error("No memory for workspace... impossible to continue.");
     } else if (n_workspace > world_dim * world_dim) {
@@ -153,9 +164,9 @@ void simulazione(
     if(biases_models==nullptr && weights_models==nullptr){
 
         // Generation random models
-        launch_fill_random_kernel(model_weights_d,n_weight*n_creature,-1.0f,1.0f,0,streams[0]);
+        launch_fill_random_kernel(model_weights_d,n_weight*n_creature,-1.0f,1.0f,0, 0);
         CUDA_CHECK(cudaGetLastError());
-        launch_fill_random_kernel(model_biases_d,n_bias*n_creature,-1.0f,1.0f,0,streams[0]);
+        launch_fill_random_kernel(model_biases_d,n_bias*n_creature,-1.0f,1.0f,0, 0);
         CUDA_CHECK(cudaGetLastError());
 
         // Load on CPU vettore pesi tutti i modelli (world_weights_h è vettore host con dati)
@@ -186,20 +197,18 @@ void simulazione(
 
         printf("LOAD MODEL ON GPU\n");
 
-        // - Azzeramento mondo valori,id,contributi,signaling 
-        launch_reset_kernel<float>(world_value_d, world_dim * world_dim, streams[0]);
+        // - Azzeramento mondo valori,id,signaling
+        launch_reset_kernel<float>(world_value_d, world_dim * world_dim, 0);
         CUDA_CHECK(cudaGetLastError());
-        launch_reset_kernel<int>(world_id_d, world_dim * world_dim, streams[0]);
+        launch_reset_kernel<int>(world_id_d, world_dim * world_dim, 0);
         CUDA_CHECK(cudaGetLastError());
-        launch_reset_kernel<float>(world_contributions_d, world_dim * world_dim * n_creature, streams[0]);
-        CUDA_CHECK(cudaGetLastError());
-        launch_reset_kernel<float>(world_signal_d, world_dim * world_dim, streams[0]);
+        launch_reset_kernel<float>(world_signal_d, world_dim * world_dim, 0);
         CUDA_CHECK(cudaGetLastError());
 
         // - Azzeramento vettore valutazione x occupazione ed energia
-        launch_reset_kernel<float>(energy_vector_d, n_creature, streams[0]);
+        launch_reset_kernel<float>(energy_vector_d, n_creature, 0);
         CUDA_CHECK(cudaGetLastError());
-        launch_reset_kernel<float>(occupation_vector_d, n_creature, streams[0]);
+        launch_reset_kernel<float>(occupation_vector_d, n_creature, 0);
         CUDA_CHECK(cudaGetLastError());
 
         printf("RESET ALL MATRIX \n");    
@@ -239,28 +248,27 @@ void simulazione(
         cuda_memcpy(alive_cells_d, alive_cells_h, tot_world_dim_size_int, cudaMemcpyHostToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
-        /*
         // - Aggiunta ostacoli al mondo
-        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, streams[0]);
+        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, 0);
         CUDA_CHECK(cudaGetLastError());
-        */
         
         // - Aggiunta cibo al mondo
-        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.96f, streams[0]);
+        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.96f, 0);
         CUDA_CHECK(cudaGetLastError());
         
         // - Ritorno mondo valori e mondo id definitivi su CPU per debug 
+        /*
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, streams[0]);
         CUDA_CHECK(cudaGetLastError());
         cuda_memcpy(world_id_h, world_id_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
         CUDA_CHECK(cudaGetLastError());
+        */
 
         cudaDeviceSynchronize();
 
         /*======================================================================================================================================*/
         for(int step=0; step<N_STEPS && *n_cell_alive_h > 0; step++){
             printf("CELLULE VIVE = %d \n",*n_cell_alive_h);
-            //usleep(500000);
             // attivazione del render se il flag è attivo
             if(render){
                 if (glfwWindowShouldClose(window)) {
@@ -268,7 +276,7 @@ void simulazione(
                     goto fine;
                 }
             }
-            std::cout << "Step " << step << "\n";
+            std::cout << "Step: " << epoca << "." << step << "\n";
 
             // -------------------------------------------
             // FASE 2 : calcolo step 
@@ -277,9 +285,9 @@ void simulazione(
             int vision = sqrt(dim_input/2);
 
             // reset matrice dei contributi e workspace 
-            launch_reset_kernel<float>(world_contributions_d, world_dim * world_dim * n_creature, streams[0]);
+            launch_reset_kernel<float>(world_contributions_d, world_dim * world_dim * n_creature, 0);
             CUDA_CHECK(cudaGetLastError());
-            launch_reset_kernel<float>(workspace_input_d, n_workspace*input_size, streams[0]);
+            launch_reset_kernel<float>(workspace_input_d, n_workspace*input_size, 0);
             CUDA_CHECK(cudaGetLastError());
 
             //inizializzo l'offset per le cellule per trovare la corrispettiva stazione di lavoro
@@ -358,7 +366,7 @@ void simulazione(
                 world_dim,
                 n_creature,
                 n_cell_alive_d,
-                streams[0]
+                0
             );
             CUDA_CHECK(cudaGetLastError());
 
@@ -368,16 +376,14 @@ void simulazione(
                 alive_cells_d,
                 n_cell_alive_d,
                 n_cell_alive_h,
-                streams[0]
+                0
             );
             CUDA_CHECK(cudaGetLastError());
-
-            //printf("launch_cellule_cleanup \n");
 
             // se il render è attivo genero la schermata con openGL
             if(render){
 
-                launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, streams[0]);
+                launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, 0);
                 CUDA_CHECK(cudaGetLastError());
                 
                 cudaMemcpy(world_rgb_h, world_rgb_d, tot_world_dim_size_float * 3, cudaMemcpyDeviceToHost);
@@ -407,7 +413,7 @@ void simulazione(
             } 
 
             // - Aggiornamento vettori valutazione occupazione ed energia
-            launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature,streams[0]);
+            launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature, 0);
             CUDA_CHECK(cudaGetLastError());
 
             /*
@@ -444,10 +450,10 @@ void simulazione(
         int limit = n_creature * 0.4f;
 
         // - spostamento vettore energia su HOST
-        cuda_memcpy(energy_vector_h,energy_vector_d,tot_energy_vector_size,cudaMemcpyDeviceToHost,cc_major, streams[0]);
+        cuda_memcpy(energy_vector_h,energy_vector_d,tot_energy_vector_size,cudaMemcpyDeviceToHost,cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
         // - spostamento vettore occupazione su HOST
-        cuda_memcpy(occupation_vector_h,occupation_vector_d,tot_occupation_vector_size,cudaMemcpyDeviceToHost,cc_major, streams[0]);
+        cuda_memcpy(occupation_vector_h,occupation_vector_d,tot_occupation_vector_size,cudaMemcpyDeviceToHost,cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
         // - Ordinamento punteggi creature
@@ -483,7 +489,7 @@ void simulazione(
                 0.30f, 
                 1.0f, 
                 0, 
-                streams[0]
+                0
             );
             CUDA_CHECK(cudaGetLastError());
 
@@ -491,17 +497,17 @@ void simulazione(
 
 
         // - Ritorno vettore nuovi pesi creature
-        cuda_memcpy(model_weights_h, new_model_weights_d, tot_models_weight_size, cudaMemcpyDeviceToHost, cc_major, streams[0]);
+        cuda_memcpy(model_weights_h, new_model_weights_d, tot_models_weight_size, cudaMemcpyDeviceToHost, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
         // - Ritorno vettore nuovi bias creature 
-        cuda_memcpy(model_biases_h, new_model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToHost, cc_major, streams[0]);
+        cuda_memcpy(model_biases_h, new_model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToHost, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
         // - Load vettore nuovi pesi su vettore vecchi pesi
-        cuda_memcpy(model_weights_d, new_model_weights_d, tot_models_weight_size, cudaMemcpyDeviceToDevice, cc_major, streams[0]);
+        cuda_memcpy(model_weights_d, new_model_weights_d, tot_models_weight_size, cudaMemcpyDeviceToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
         // - Load vettore nuovi bias su vettore vecchi bias 
-        cuda_memcpy(model_biases_d, new_model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToDevice, cc_major, streams[0]);
+        cuda_memcpy(model_biases_d, new_model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
         save_model_on_file("models/file1.txt",model_structure,n_layer,model_weights_h,model_biases_h,n_weight,n_bias,n_creature);
@@ -522,29 +528,36 @@ void simulazione(
     }
 
     // Free zone di memoria GPU
-    cuda_Free(world_value_d, cc_major, streams[0]);
-    cuda_Free(world_id_d, cc_major, streams[0]);
-    cuda_Free(world_contributions_d, cc_major, streams[0]);
-    cuda_Free(world_signal_d, cc_major, streams[0]);
-    cuda_Free(model_weights_d, cc_major, streams[0]);
-    cuda_Free(model_biases_d, cc_major, streams[0]);
-    cuda_Free(alive_cells_d, cc_major, streams[0]);
-    cuda_Free(occupation_vector_d, cc_major, streams[0]);
-    cuda_Free(energy_vector_d, cc_major, streams[0]);
-    //cuda_Free(creature_ordered_d,cc_major,streams[0]);
-    cuda_Free(workspace_input_d, cc_major, streams[0]);
-    // cuda_Free(workspace_output_d, cc_major, streams[0]);
-    cuda_Free(new_model_weights_d, cc_major, streams[0]);
-    cuda_Free(new_model_biases_d, cc_major, streams[0]);
+    cuda_Free(world_rgb_d, cc_major, 0);
+    cuda_Free(world_value_d, cc_major, 0);
+    cuda_Free(world_id_d, cc_major, 0);
+    cuda_Free(world_contributions_d, cc_major, 0);
+    cuda_Free(world_signal_d, cc_major, 0);
+    cuda_Free(alive_cells_d, cc_major, 0);
+    cuda_Free(occupation_vector_d, cc_major, 0);
+    cuda_Free(energy_vector_d, cc_major, 0);
+    cuda_Free(model_biases_d, cc_major, 0);
+    cuda_Free(model_weights_d, cc_major, 0);
+    cuda_Free(new_model_weights_d, cc_major, 0);
+    cuda_Free(new_model_biases_d, cc_major, 0);
+    cuda_Free(workspace_input_d, cc_major, 0);
     // cuda_Free(n_cell_alive_d,cc_major, streams[0]);
+    // cuda_Free(creature_ordered_d,cc_major,streams[0]);
+    // cuda_Free(workspace_output_d, cc_major, streams[0]);
 
-    free(world_value_h);
-    free(world_id_h);
+
     free(energy_vector_h);
     free(occupation_vector_h);
     free(creature_ordered_h);
     free(model_weights_h);
     free(model_biases_h);
+
+    free(alive_cells_h);
+    free(world_id_h);
+    free(world_signal_h);
+    free(world_rgb_h);
+    free(world_value_h);
+
     cudaFreeHost(n_cell_alive_h);
     
     
