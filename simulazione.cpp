@@ -373,16 +373,18 @@ void simulazione(
                 n_cell_alive_d,
                 streams[0]
             );
-            //printf("launch_world_update \n");
-
             cudaDeviceSynchronize();
-            launch_cellule_cleanup(
-                alive_cells_d,
-                n_cell_alive_h,
-                n_cell_alive_d,
+
+            launch_find_index_cell_alive(
                 world_id_d,
+                world_dim*world_dim,
+                alive_cells_d,
+                n_cell_alive_d,
+                n_cell_alive_h,
                 streams[0]
             );
+            CUDA_CHECK(cudaGetLastError());
+
             //printf("launch_cellule_cleanup \n");
 
             // se il render è attivo genero la schermata con openGL
@@ -437,11 +439,13 @@ void simulazione(
             CUDA_CHECK(cudaGetLastError());
             // - Ritorno mondo id 
             cuda_memcpy(world_id_h, world_id_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
-            CUDA_CHECK(cudaGetLastError());    
+            CUDA_CHECK(cudaGetLastError());  
+            
+            /*
             // - Ritorno alive_cell_d
             cuda_memcpy(alive_cells_h, alive_cells_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
             CUDA_CHECK(cudaGetLastError());   
-            /*
+            
             
             std::cout << "\n=== ALIVE CELLS ===\n";
             for (int i = 0; i < *n_cell_alive_h; i++) {
@@ -450,6 +454,7 @@ void simulazione(
 
             }
             */
+            
 
             // salvo il mondo per debug 
             save_map(file,world_dim,world_value_h,world_id_h);

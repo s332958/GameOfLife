@@ -138,81 +138,6 @@ __global__ void world_update_kernel(
 
 }    
     
-    //==============================================================================================
-    
-__global__ void cellule_cleanup_kernel(int *cellule_cu, int* temp_cellule_cu, int *id_matrix, int* cellCount, int* mask_cu, bool* mask_alive){
-        
-        int idx = threadIdx.x + blockIdx.x * blockDim.x;
-
-        //ritorno i thread che eccedono il numero di cellule vive
-        if(idx >= *cellCount) return;
-
-        int local_cellCount = *cellCount;
-        
-        //inizializzo la maschera a 0 e temp cellule a 0 e alive a false
-        mask_cu[idx] = 0;
-        temp_cellule_cu[idx] = 0;
-        mask_alive[idx] = false;
-    
-        // se trovo cellule con id > 0 quindi occupate da creature segno 1 in mask_cu e true in mask_alive
-        if(id_matrix[cellule_cu[idx]] > 0){
-           mask_cu[idx] = 1; 
-           mask_alive[idx] = true;
-        }  
-
-        /*
-        
-        //printf("ID_MATRIX: %d IDX: %d T: %d cell count: %d\n",id_matrix[cellule_cu[idx]],cellule_cu[idx],idx,*cellCount);
-        // dichiaro un valore di parallelizzazione 32 è ottimale poicheè è la dimensione di un warp
-        int dim_paral = 32;
-        int id_sort_x = idx % dim_paral;
-        int id_sort_y = idx / dim_paral;
-        
-        // indice di ordinamento
-        int index_sort = id_sort_y * dim_paral + id_sort_x;
-        
-        // tutti i thread_x con 0 iniziano a fare parallelizzazione
-        if (id_sort_x == 0){
-            int increment = 0;
-            for (int i = 0; i < dim_paral; i++){
-                
-                if(index_sort + i < *cellCount){ 
-                    increment = increment + mask_cu[index_sort + i];               
-                    mask_cu[index_sort + i] = increment;
-                }
-
-            }    
-        }    
-        __syncthreads();
-        
-        if (id_sort_y != 0){
-            mask_cu[index_sort] = mask_cu[index_sort] + mask_cu[id_sort_y*dim_paral - 1];
-        } 
-        */
-       if (idx == 0){
-            int increment = 0;
-            for(int i = 0; i < local_cellCount; i++){
-                increment = increment + mask_cu[i];               
-                mask_cu[i] = increment;
-            }
-       }
-   
-        __syncthreads();
-    
-        if (mask_alive[idx] == true){
-            temp_cellule_cu[mask_cu[idx] - 1] = cellule_cu[idx];
-        }     
-        int new_cellCount = mask_cu[local_cellCount - 1];
-        if (idx > new_cellCount)return;
-    
-        cellule_cu[idx] = temp_cellule_cu[idx];  
-    
-        if (idx != 0) return;
-        *cellCount = new_cellCount; 
-    
-        
-    } 
-    
     //================================================================================
     
     //Wrapper add objects to world
@@ -261,34 +186,231 @@ void launch_world_update(
 
 }
 
-//Wrapper cellule cleanup
-void launch_cellule_cleanup(int* cells, int* cellCount_h, int* cellCount_d, int* id_matrix, cudaStream_t stream){
 
-    int cellCountR = *cellCount_h;
-    if(cellCountR == 0) {
-        // printf("cellCount = 0 \n");
-        return;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ===============================================================================================================================================================
+// NUOVO TEST
+
+
+__global__ void find_index_cell_alive_kernel(
+    int *world_id,
+    int *cell_alive_vector,
+    int world_dim_tot,
+    int *n_cell_alive
+) {
+    extern __shared__ int shared_mem[];
+
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int tid = threadIdx.x;
+
+    int is_alive = 0;
+
+    if (idx < world_dim_tot) {
+        is_alive = (world_id[idx] > 0);
+        cell_alive_vector[idx] = is_alive * (idx+1);
     }
-    
-    int* temp_cellule_cu;
-    int* mask_cu;
-    bool* mask_alive;
-    cudaMalloc((void**)&mask_alive, cellCountR * sizeof(bool));
-    cudaMalloc((void**)&mask_cu, cellCountR * sizeof(int));
-    cudaMalloc((void**)&temp_cellule_cu, cellCountR * sizeof(int));
 
-    cudaMemset(mask_alive,0,cellCountR * sizeof(bool));
-    cudaMemset(mask_cu,0,cellCountR * sizeof(int));
-    cudaMemset(temp_cellule_cu,0,cellCountR * sizeof(int));
+    // Scriviamo il valore nella shared memory (0 se fuori dai limiti)
+    shared_mem[tid] = (idx < world_dim_tot) ? is_alive : 0;
+    __syncthreads();
 
-    int n_thread_per_block = 1024; //properties.maxThreadsPerBlock; 
-    int thread_number = cellCountR;
-    int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
+    // Riduzione generale per blocchi NON potenze di due
+    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+        if (tid < s+1 && tid+s+1 <blockDim.x) {
+            shared_mem[tid] += shared_mem[tid + s+1];
+            shared_mem[tid + s+1]=0;
+        }
+        __syncthreads();
+    }
 
-    cellule_cleanup_kernel<<<n_block, n_thread_per_block, 0, stream>>>(cells, temp_cellule_cu, id_matrix, cellCount_d, mask_cu, mask_alive);
-    
-    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori cellule_cleanup_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
-    cudaFree(temp_cellule_cu);
-    cudaFree(mask_alive);
-    cudaFree(mask_cu);
+    if (tid == 0) {
+        shared_mem[0] += shared_mem[1];
+        shared_mem[1] = 0;
+        atomicAdd(n_cell_alive, shared_mem[0]);
+    }
+}
+
+__global__ void compact_cell_alive_kernel_pt1(
+    int *alive_cell_vector,
+    int *support_vector,
+    int *n_alive_cell,
+    int world_dim
+) {
+    extern __shared__ int shared_mem[]; // [2 * blockDim.x + 1]
+
+    int global_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int local_idx = threadIdx.x;
+
+    // Clear shared memory
+    shared_mem[local_idx] = 0;
+    shared_mem[blockDim.x + local_idx] = 0;
+
+    // Carica in shared
+    if (global_idx < world_dim) {
+        shared_mem[local_idx] = alive_cell_vector[global_idx];
+        alive_cell_vector[global_idx] = 0;
+    }
+
+    __syncthreads();
+
+    // Filtro: fatto da thread 0
+    if (local_idx == 0) {
+        int count = 0;
+        for (int i = 0; i < blockDim.x; i++) {
+            int val = shared_mem[i];
+            if (val > 0) {
+                shared_mem[blockDim.x + count] = val;
+                count++;
+            }
+        }
+
+        shared_mem[2 * blockDim.x] = count;
+        support_vector[blockIdx.x] = count;
+    }
+
+    __syncthreads();
+
+    // Scrittura valori filtrati nel buffer alive (solo entro limiti)
+    int count = shared_mem[2 * blockDim.x];
+    if (local_idx < count) {
+        alive_cell_vector[global_idx] = shared_mem[blockDim.x + local_idx];
+    }
+}
+
+
+
+__global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *support_vector, int *n_alive_cell, int n_block, int dim_block){
+
+    __shared__ int shared_mem[2];       
+    //mem[0] starting index, mem[1] number of element 
+
+    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+
+    if(n_block==0 && threadIdx.x==0){
+        shared_mem[0] = 0;
+        shared_mem[1] = support_vector[n_block];
+        support_vector[n_block] = shared_mem[0] + shared_mem[1];
+    }else if(n_block>0 && threadIdx.x==0){
+        shared_mem[0] = support_vector[n_block-1];
+        shared_mem[1] = support_vector[n_block];
+        support_vector[n_block] = shared_mem[0] + shared_mem[1];
+    }
+
+    __syncthreads();
+
+    int idx_alive_cell_read = n_block*dim_block+idx;
+    if(idx<shared_mem[1]){
+        int offset = shared_mem[0];
+        //printf("read cell: %d \n",idx_alive_cell_read);
+        int idx_alive_cell_write = offset+idx;
+        alive_cell_vector[idx_alive_cell_write] = alive_cell_vector[idx_alive_cell_read]-1;
+    }
+
+
+}
+
+
+//Wrapper compute alive cell
+void launch_find_index_cell_alive(
+    int *world_id,
+    int world_dim_tot,
+    int *alive_cell_vector,
+    int *n_cell_alive_d,
+    int *n_cell_alive_h,
+    cudaStream_t stream
+) {
+    int n_thread = 1024;
+    if(world_dim_tot<n_thread) n_thread = world_dim_tot;
+    int n_block = (world_dim_tot+n_thread-1) / n_thread;
+
+    int *support_vector;
+    cudaMalloc((void**) &support_vector, world_dim_tot*sizeof(int));
+
+    cudaMemsetAsync(n_cell_alive_d, 0, sizeof(int),stream);
+
+    find_index_cell_alive_kernel<<<n_block,n_thread,sizeof(int)*(n_thread+1),stream>>>(
+        world_id,
+        alive_cell_vector,
+        world_dim_tot,
+        n_cell_alive_d
+    );
+
+   cudaDeviceSynchronize();
+
+    n_thread = 512;
+    n_block = (world_dim_tot+n_thread-1) / n_thread;
+
+    compact_cell_alive_kernel_pt1<<<n_block,n_thread,sizeof(int)*(n_thread*2+1),stream>>>(
+        alive_cell_vector,
+        support_vector,
+        n_cell_alive_d,
+        world_dim_tot
+    );
+
+    int block_dim_pt1 = n_thread;
+    int n_block_pt1 = n_block;
+
+    for(int i=0; i<n_block_pt1; i++){
+        compact_cell_alive_kernel_pt2<<<1,n_thread,0,stream>>>(
+            alive_cell_vector,
+            support_vector,
+            n_cell_alive_d,
+            i,
+            block_dim_pt1
+        );
+    }
+
+    cudaFree(support_vector);
+
+
 }

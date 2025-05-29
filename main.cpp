@@ -23,7 +23,7 @@ float * biases_models = nullptr;
 int const METHOD_EVAL = 1;
 
 size_t reserve_free_memory = 1024 * 1024 * 300; // * 1024;// 1GB
-int const MAX_WORKSPACE = 50;
+int const MAX_WORKSPACE = 10;
 
 const int MAX_CREATURE = 64;
 
