@@ -368,6 +368,7 @@ void simulazione(
             launch_world_update(
                 world_value_d,
                 world_id_d,
+                world_signal_d,
                 world_contributions_d,
                 alive_cells_d,
                 world_dim,
