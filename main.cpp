@@ -14,16 +14,12 @@
 #include <format>
 
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
-const int world_dim = 300;
-const int n_creature = 20;
 const int n_layer = 5;
 int model_structure [n_layer] = {162, 50, 50, 50, 10};
 float * weights_models = nullptr; 
 float * biases_models = nullptr; 
-int const METHOD_EVAL = 1;
 
 size_t reserve_free_memory = 1024 * 1024 * 300; // * 1024;// 1GB
-int const MAX_WORKSPACE = 10000;
 
 const int MAX_CREATURE = 64;
 
@@ -40,6 +36,10 @@ int main(int argc, char* argv[]) {
     int numero_epoch = 1;
     int numero_step = 1;
     int scale = 1;
+    int world_dim = 100;
+    int n_creature = 10;
+    int MAX_WORKSPACE = 10000;
+    int METHOD_EVAL = 1;
     
     // Controlla se c'è almeno un argomento
     for (int i = 1; i < argc; ++i) {
@@ -55,6 +55,24 @@ int main(int argc, char* argv[]) {
         }
         if(arg == "-scale"){
             scale = std::atoi(argv[i+1]);
+        }
+        if(arg == "-world_dim"){
+            world_dim = std::atoi(argv[i+1]);
+        }
+        if(arg == "-n_creature"){
+            n_creature = std::atoi(argv[i+1]);
+            if(n_creature>MAX_CREATURE) n_creature = MAX_CREATURE;
+        }
+        if(arg == "-max_workspace"){
+            MAX_WORKSPACE = std::atoi(argv[i+1]);
+        }
+        if(arg == "-eval_method"){
+            METHOD_EVAL = std::atoi(argv[i+1]);
+            if(METHOD_EVAL!= 0 || METHOD_EVAL != 1) METHOD_EVAL = 0;
+        }
+        if(arg == "-reserve_memory"){
+            // reserve Mb of free memory for don't sature the GPU
+            reserve_free_memory = std::atoi(argv[i+1]) * 1024 * 1024;
         }
     }
     
@@ -114,10 +132,6 @@ int main(int argc, char* argv[]) {
         glfwDestroyWindow(window);
         glfwTerminate();
     }
-
-    
-
-
 
     clock_t end = clock();  // End time
     std::cout << "Tempo esecuzione programma: " << (end - start) / CLOCKS_PER_SEC << " secondi" << std::endl;

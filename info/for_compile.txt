@@ -20,3 +20,8 @@ nvidia-smi
 
 nvcc -arch=sm_50 -o testnew main.cpp simulazione.cpp libs/mappa_colori.cu libs/mondo_kernel.cu libs/NN_kernel.cu libs/utils_cpu.cpp libs/utils_kernel.cu -lGL -lglfw -lGLEW
 compute-sanitizer ./testnew
+
+
+
+
+./testnew -ep 10 -st 1000 -n_creature 10 -world_dim 100 -max_workspace 10 -eval_method 1 -reserve_memory 100 -scale 3 -render
