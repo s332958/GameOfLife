@@ -21,12 +21,22 @@ void simulazione(
     int *model_structure, int n_layer, size_t reserve_free_memory, 
     float *weights_models, float *biases_models, 
     int const N_EPHOCS, int const N_STEPS, int const MAX_WORKSPACE, int const METHOD_EVAL, 
-    bool render,
+    bool render,        // checkpoint_epoc 
     GLFWwindow* window, GLuint textureID
 ) {
 
-    // int input_size = model_structure[0];
-    //int output_size = model_structure[n_layer-1];
+
+    //  -----------------------------------------
+    //
+    //  -----------------------------------------
+    int checkpoint_epoch = 10;
+    // parametrizzare food e obstacles, mutazioni randomiche, soglia di ricombinazione
+
+    // sistemare tutti i reset con memsetasync
+    // mettere array di supporto all'inizio e si passa come argomento 
+
+
+
 
 
     // -------------------------------------------
@@ -94,8 +104,6 @@ void simulazione(
     if(biases_models==nullptr)  model_biases_h = (float*) malloc(tot_models_bias_size);
     else model_biases_h        = biases_models;
 
-
-
     // stream CUDA
     int n_stream = MAX_WORKSPACE;
     int a_stream = -1;
@@ -104,8 +112,7 @@ void simulazione(
         for(int i=0;i<n_stream;i++) CUDA_CHECK(cudaStreamCreate(&streams[i]));
     }
 
-    // Allocazioni GPU con stream diversi
-    
+    // Allocazioni GPU 
     float *world_rgb_d                = (float*) cuda_allocate(tot_world_dim_size_float * 3, cc_major, 0);
     float *world_value_d              = (float*) cuda_allocate(tot_world_dim_size_float, cc_major, 0);    
     float *world_signal_d             = (float*) cuda_allocate(tot_world_dim_size_float, cc_major, 0);
@@ -181,6 +188,16 @@ void simulazione(
 
         printf("FINE GENERAZIONE MODELLI \n");
     }
+    else if(weights_models!=nullptr && biases_models!=nullptr){
+        // Load on GPU vettore pesi tutti i modelli (world_weights_h è vettore host con dati)
+        cuda_memcpy(model_weights_d, model_weights_h, tot_models_weight_size, cudaMemcpyHostToDevice, cc_major, 0);
+        CUDA_CHECK(cudaGetLastError());
+        // Load on GPU vettore bias tutti i modelli (world_biases_h è vettore host con dati)
+        cuda_memcpy(model_biases_d, model_biases_h, tot_models_bias_size, cudaMemcpyHostToDevice, cc_major, 0);
+        CUDA_CHECK(cudaGetLastError());
+    }
+
+    printf("LOAD MODEL ON GPU\n");
 
     for (int epoca = 0; epoca < N_EPHOCS; epoca++) {
         std::cout << "=======================  Epoca: " << epoca << "  ========================\n";
@@ -188,15 +205,6 @@ void simulazione(
         // -------------------------------------------
         // FASE 1 : preparazione epoca 
         // -------------------------------------------
-
-        // Load on GPU vettore pesi tutti i modelli (world_weights_h è vettore host con dati)
-        cuda_memcpy(model_weights_d, model_weights_h, tot_models_weight_size, cudaMemcpyHostToDevice, cc_major, 0);
-        CUDA_CHECK(cudaGetLastError());
-        // Load on GPU vettore bias tutti i modelli (world_biases_h è vettore host con dati)
-        cuda_memcpy(model_biases_d, model_biases_h, tot_models_bias_size, cudaMemcpyHostToDevice, cc_major, 0);
-        CUDA_CHECK(cudaGetLastError());
-
-        printf("LOAD MODEL ON GPU\n");
 
         // - Azzeramento mondo valori,id,signaling
         launch_reset_kernel<float>(world_value_d, world_dim * world_dim, 0);
@@ -215,6 +223,7 @@ void simulazione(
         printf("RESET ALL MATRIX \n");    
         
         // - Passo il mondo valori ed ID sulla CPU post RESET
+        // - Possibile ottimizzazione?
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
         cuda_memcpy(world_id_h, world_id_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, 0);
@@ -262,8 +271,10 @@ void simulazione(
         CUDA_CHECK(cudaGetLastError());
 
         // - Aggiunta cibo al mondo
+        // - Possibile ottimizzazione togliendo i curandstate
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.99f, 0);
         CUDA_CHECK(cudaGetLastError());
+
         /*
         // - Ritorno mondo valori e mondo id definitivi su CPU per debug         
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, streams[0]);
@@ -507,14 +518,6 @@ void simulazione(
 
         }
 
-
-        // - Ritorno vettore nuovi pesi creature
-        cuda_memcpy(model_weights_h, new_model_weights_d, tot_models_weight_size, cudaMemcpyDeviceToHost, cc_major, 0);
-        CUDA_CHECK(cudaGetLastError());
-        // - Ritorno vettore nuovi bias creature 
-        cuda_memcpy(model_biases_h, new_model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToHost, cc_major, 0);
-        CUDA_CHECK(cudaGetLastError());
-
         // - Load vettore nuovi pesi su vettore vecchi pesi
         cuda_memcpy(model_weights_d, new_model_weights_d, tot_models_weight_size, cudaMemcpyDeviceToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
@@ -522,8 +525,17 @@ void simulazione(
         cuda_memcpy(model_biases_d, new_model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
-        save_model_on_file("models/file1.txt",model_structure,n_layer,model_weights_h,model_biases_h,n_weight,n_bias,n_creature);
-        printf("MODEL GENERATE AND SAVE \n");
+        if(epoca%checkpoint_epoch==0 || epoca==N_EPHOCS){
+            // - Ritorno vettore nuovi pesi creature
+            cuda_memcpy(model_weights_h, new_model_weights_d, tot_models_weight_size, cudaMemcpyDeviceToHost, cc_major, 0);
+            CUDA_CHECK(cudaGetLastError());
+            // - Ritorno vettore nuovi bias creature 
+            cuda_memcpy(model_biases_h, new_model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToHost, cc_major, 0);
+            CUDA_CHECK(cudaGetLastError());
+
+            save_model_on_file("models/file1.txt",model_structure,n_layer,model_weights_h,model_biases_h,n_weight,n_bias,n_creature);
+            printf("MODEL GENERATE AND SAVE \n");
+        }
 
     }
 

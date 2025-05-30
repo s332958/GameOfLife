@@ -394,7 +394,7 @@ void launch_find_index_cell_alive(
         n_cell_alive_d
     );
 
-   cudaDeviceSynchronize();
+   //cudaDeviceSynchronize();
 
     n_thread = 512;
     n_block = (world_dim_tot+n_thread-1) / n_thread;
