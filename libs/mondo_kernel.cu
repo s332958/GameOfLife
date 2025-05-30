@@ -146,7 +146,38 @@ __global__ void world_update_kernel(
 }    
     
     //================================================================================
-    
+__global__ void clean_around_cells_kernel (float* world_value_d, int* world_id_d, int dim_world, int* cellule, int ncellule, int window_size){
+
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if(idx >= ncellule * window_size * window_size) return;
+
+    int cell_idx = cellule[idx / (window_size * window_size)];
+
+    int filter_idx = idx % (window_size * window_size);
+
+    int center_x = cell_idx % dim_world;
+    int center_y = cell_idx / dim_world;
+
+    int filter_x = filter_idx % window_size;
+    int filter_y = filter_idx / window_size;
+
+    int radius =  window_size/2;
+
+    int final_x = (center_x + (filter_x - radius) + dim_world) % dim_world;
+    int final_y = (center_y + (filter_y - radius) + dim_world) % dim_world;
+
+
+    int final_index = final_y * dim_world + final_x;
+
+    if (final_index == cell_idx)return;
+
+    world_value_d[final_index] = 0;
+    world_id_d[final_index] = 0;
+
+}    
+
+ //============================================================================================
     //Wrapper add objects to world
 void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_world,
                                 int id, float min_value, float max_value, float threshold,
@@ -197,7 +228,16 @@ void launch_world_update(
 
 
 
+void launch_clean_around_cells(float* world_value_d, int* world_id_d, int dim_world, int* cellule, int* ncellule, int window_size, cudaStream_t stream){
 
+    int n_thread_per_block = 1024; 
+    int localNcellule = *ncellule;
+    int thread_number = localNcellule * window_size * window_size;
+    int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
+
+
+    clean_around_cells_kernel<<<n_block,n_thread_per_block,0,stream>>>(world_value_d, world_id_d, dim_world, cellule, localNcellule, window_size);
+}
 
 
 

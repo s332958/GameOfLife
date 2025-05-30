@@ -30,6 +30,25 @@ void simulazione(
     //
     //  -----------------------------------------
     int checkpoint_epoch = 10;
+    
+    float PN_scale_obstacles = 10.0f;
+    float PN_threshold_obstacles = 0.85f;
+
+    float PN_scale_food = 8.0f;
+    float PN_threshold_food = 0.90f;
+    float random_threshold_food = 0.99f;
+
+
+    float fraction_recombination = 0.4f;
+    
+    float gen_x_block = 0.2f;
+    float mutation_probability = 0.10f;
+    float mutation_range = 0.10f;
+
+    int clean_window_size = 7;
+
+
+
     // parametrizzare food e obstacles, mutazioni randomiche, soglia di ricombinazione
 
     // sistemare tutti i reset con memsetasync
@@ -206,11 +225,13 @@ void simulazione(
         // FASE 1 : preparazione epoca 
         // -------------------------------------------
 
-        // - Azzeramento mondo valori,id,signaling
+        // - Azzeramento mondo valori,id,signaling (da eliminare), usare memset(arr, 0, sizeof(arr)); la copia in gpu avviene dopo, sovrascrivendo l'array vecchio
         launch_reset_kernel<float>(world_value_d, world_dim * world_dim, 0);
         CUDA_CHECK(cudaGetLastError());
         launch_reset_kernel<int>(world_id_d, world_dim * world_dim, 0);
         CUDA_CHECK(cudaGetLastError());
+
+
         launch_reset_kernel<float>(world_signal_d, world_dim * world_dim, 0);
         CUDA_CHECK(cudaGetLastError());
 
@@ -258,23 +279,22 @@ void simulazione(
         cuda_memcpy(alive_cells_d, alive_cells_h, tot_world_dim_size_int, cudaMemcpyHostToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
-        // - Aggiunta ostacoli al mondo
-        launch_perlinNoise_obstacles(world_dim, world_id_d, 0);
+        // - Aggiunta ostacoli perlin al mondo
+        launch_perlinNoise_obstacles(world_dim, world_id_d, PN_scale_obstacles, PN_threshold_obstacles, 0);
         CUDA_CHECK(cudaGetLastError());
         
-        // - Aggiunta ostacoli random al mondo
-        // launch_add_objects_to_world(world_value_d, world_id_d, world_dim, -1, 1.0f, 1.0f, 0.9f, 0);
-        // CUDA_CHECK(cudaGetLastError());   
-
-        // - Aggiunta cibo al mondo
-        launch_perlinNoise_food(world_dim, world_id_d, world_value_d, 0);
+        // - Aggiunta cibo perlin al mondo
+        launch_perlinNoise_food(world_dim, world_id_d, world_value_d, PN_scale_food, PN_threshold_food, 0);
         CUDA_CHECK(cudaGetLastError());
 
         // - Aggiunta cibo al mondo
         // - Possibile ottimizzazione togliendo i curandstate
-        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, 0.99f, 0);
-        CUDA_CHECK(cudaGetLastError());
+        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, random_threshold_food, 0);
+        CUDA_CHECK(cudaGetLastError())
 
+        //crea una zona di vuoto attorno alle cellele appena nate (diminuisce l'influenza della fortuna nello spawn)
+        launch_clean_around_cells(world_value_d, world_id_d, world_dim, alive_cells_d, n_cell_alive_h, clean_window_size, 0);
+        CUDA_CHECK(cudaGetLastError());
         /*
         // - Ritorno mondo valori e mondo id definitivi su CPU per debug         
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, streams[0]);
@@ -370,10 +390,12 @@ void simulazione(
                 }
 
                 // Aspetto che tutti i kernel del batch finiscano prima di riutilizzare i workspace
+                /*
                 for(int workspace_idx = 0; workspace_idx < max; workspace_idx++) {
                     int stream_id = workspace_idx % n_stream;
                     cudaStreamSynchronize(streams[stream_id]);
                 }
+                */
 
             }
             
@@ -470,7 +492,7 @@ void simulazione(
 
 
         // imposto una percentuale di quante creature voglio tenere per la rimescolazione genetica
-        int limit = n_creature * 0.4f;
+        int limit = n_creature * fraction_recombination;
 
         // - spostamento vettore energia su HOST
         cuda_memcpy(energy_vector_h,energy_vector_d,tot_energy_vector_size,cudaMemcpyDeviceToHost,cc_major, 0);
@@ -508,9 +530,9 @@ void simulazione(
                 gen1, 
                 gen2,
                 i, 
-                0.2f, 
-                0.30f, 
-                1.0f, 
+                gen_x_block, 
+                mutation_probability, 
+                mutation_range, 
                 0, 
                 0
             );

@@ -27,3 +27,12 @@ void launch_find_index_cell_alive(
     int *n_cell_alive_h,
     cudaStream_t stream
 );
+
+void launch_clean_around_cells(
+    float* world_value_d, 
+    int* world_id_d, 
+    int dim_world, 
+    int* cellule, 
+    int* ncellule, 
+    int window_size,
+    cudaStream_t stream);
