@@ -42,6 +42,7 @@ __global__ void add_objects_to_world_kernel(float *world_value, int *world_id, i
 __global__ void world_update_kernel(
     float *world_value, 
     int *id_matrix, 
+    float *world_signal,
     float *contribution_matrix,
     int dim_world, 
     int number_of_creatures, 
@@ -60,6 +61,7 @@ __global__ void world_update_kernel(
         
         // se l'ID è -1 ovvero un ostacolo ritorno
         if(ID == -1) {
+            world_signal[index] = -1;
             return;
         }
         
@@ -107,6 +109,8 @@ __global__ void world_update_kernel(
                 int pos = atomicAdd(cellCount, 1);
                 cells[pos] = index;
                 //printf("UPDATE CELL ALIVE: %d con index %d \n",pos-1,index);
+            }else{
+                world_signal[index] = 0;
             }    
         } 
         
@@ -162,6 +166,7 @@ void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_
 void launch_world_update(
     float *world_value,
     int *id_matrix,
+    float *world_signal,
     float *contribution_matrix, 
     int *cells,
     int world_dim, 
@@ -178,6 +183,7 @@ void launch_world_update(
     world_update_kernel<<<n_block,n_thread_per_block,0,stream>>>(
         world_value, 
         id_matrix,
+        world_signal,
         contribution_matrix,
         world_dim,
         number_of_creatures,

@@ -11,6 +11,7 @@ void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_
 // Wrapper per aggiornare lo stato del mondo
 void launch_world_update(float* world_value,
                          int* id_matrix,
+                         float* world_signal,
                          float* contribution_matrix, 
                          int* cells,
                          int world_dim, 

@@ -41,8 +41,8 @@ __device__ float grad(int hash, float x, float y) {
 }
 
 __device__ float perlin(float x, float y) {
-    int X = (int)floorf(x) & 254;
-    int Y = (int)floorf(y) & 254;
+    int X = (int)floorf(x) % 254;
+    int Y = (int)floorf(y) % 254;
 
     x -= floorf(x);
     y -= floorf(y);
@@ -50,8 +50,8 @@ __device__ float perlin(float x, float y) {
     float u = fade(x);
     float v = fade(y);
 
-    int A = (perm[X] + Y) & 254;
-    int B = (perm[X + 1] + Y) & 254;
+    int A = (perm[X] + Y) % 254;
+    int B = (perm[X + 1] + Y) % 254;
 
     float x1 = lerp(grad(perm[A], x, y), grad(perm[B], x - 1, y), u);
     float x2 = lerp(grad(perm[A + 1], x, y - 1), grad(perm[B + 1], x - 1, y - 1), u);
