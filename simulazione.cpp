@@ -9,6 +9,7 @@
 #include <GLFW/glfw3.h>
 
 #include <stdio.h>
+#include <cstring>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <cmath>
@@ -144,7 +145,9 @@ void simulazione(
     float *occupation_vector_d        = (float*) cuda_allocate(tot_occupation_vector_size, cc_major, 0);
     float *new_model_weights_d        = (float*) cuda_allocate(tot_models_weight_size, cc_major, 0);
     float *new_model_biases_d         = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);    
+    int   *support_vector_d           = (int*)   cuda_allocate(tot_world_dim_size_int, cc_major, 0);
     int   *n_cell_alive_d             ; 
+    
     cudaHostGetDevicePointer(&n_cell_alive_d, n_cell_alive_h , 0);
 
     // Find max dim layer
@@ -224,31 +227,42 @@ void simulazione(
         // -------------------------------------------
         // FASE 1 : preparazione epoca 
         // -------------------------------------------
+        
 
+        /*
         // - Azzeramento mondo valori,id,signaling (da eliminare), usare memset(arr, 0, sizeof(arr)); la copia in gpu avviene dopo, sovrascrivendo l'array vecchio
         launch_reset_kernel<float>(world_value_d, world_dim * world_dim, 0);
         CUDA_CHECK(cudaGetLastError());
         launch_reset_kernel<int>(world_id_d, world_dim * world_dim, 0);
         CUDA_CHECK(cudaGetLastError());
-
-
-        launch_reset_kernel<float>(world_signal_d, world_dim * world_dim, 0);
-        CUDA_CHECK(cudaGetLastError());
-
-        // - Azzeramento vettore valutazione x occupazione ed energia
-        launch_reset_kernel<float>(energy_vector_d, n_creature, 0);
-        CUDA_CHECK(cudaGetLastError());
-        launch_reset_kernel<float>(occupation_vector_d, n_creature, 0);
-        CUDA_CHECK(cudaGetLastError());
-
-        printf("RESET ALL MATRIX \n");    
-        
         // - Passo il mondo valori ed ID sulla CPU post RESET
         // - Possibile ottimizzazione?
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
         cuda_memcpy(world_id_h, world_id_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
+        launch_reset_kernel<float>(world_signal_d, world_dim * world_dim, 0);
+        CUDA_CHECK(cudaGetLastError());
+ 
+        // - Azzeramento vettore valutazione x occupazione ed energia
+        launch_reset_kernel<float>(energy_vector_d, n_creature, 0);
+        CUDA_CHECK(cudaGetLastError());
+        launch_reset_kernel<float>(occupation_vector_d, n_creature, 0);
+        CUDA_CHECK(cudaGetLastError());
+        */
+
+        std::memset(world_value_h, 0, tot_world_dim_size_float);
+        std::memset(world_id_h, 0, tot_world_dim_size_int);
+        std::memset(alive_cells_h, 0, tot_world_dim_size_int);
+
+        cudaMemset(world_signal_d, 0, tot_world_dim_size_float);    
+        CUDA_CHECK(cudaGetLastError());    
+        cudaMemset(energy_vector_d, 0, tot_energy_vector_size);
+        CUDA_CHECK(cudaGetLastError());
+        cudaMemset(occupation_vector_d, 0, tot_occupation_vector_size);
+        CUDA_CHECK(cudaGetLastError());
+
+        printf("RESET ALL MATRIX \n"); 
 
         // - Aggiunta creature al mondo 
         *n_cell_alive_h = 0;
@@ -272,6 +286,7 @@ void simulazione(
         // - Passo il mondo valori ed ID sulla GPU
         cuda_memcpy(world_value_d, world_value_h, tot_world_dim_size_float, cudaMemcpyHostToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
+
         cuda_memcpy(world_id_d, world_id_h, tot_world_dim_size_int, cudaMemcpyHostToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
@@ -290,7 +305,7 @@ void simulazione(
         // - Aggiunta cibo al mondo
         // - Possibile ottimizzazione togliendo i curandstate
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, random_threshold_food, 0);
-        CUDA_CHECK(cudaGetLastError())
+        CUDA_CHECK(cudaGetLastError());
 
         //crea una zona di vuoto attorno alle cellele appena nate (diminuisce l'influenza della fortuna nello spawn)
         launch_clean_around_cells(world_value_d, world_id_d, world_dim, alive_cells_d, n_cell_alive_h, clean_window_size, 0);
@@ -323,11 +338,18 @@ void simulazione(
             int offset=0;
             int vision = sqrt(dim_input/2);
 
+            cudaMemset(world_contributions_d, 0, tot_matrix_contribution_size);
+            CUDA_CHECK(cudaGetLastError());
+            cudaMemset(workspace_input_d, 0, workspace_size*dim_max_layer);
+            CUDA_CHECK(cudaGetLastError());
+
+            /*
             // reset matrice dei contributi e workspace 
             launch_reset_kernel<float>(world_contributions_d, world_dim * world_dim * n_creature, 0);
             CUDA_CHECK(cudaGetLastError());
             launch_reset_kernel<float>(workspace_input_d, n_workspace*dim_max_layer, 0);
             CUDA_CHECK(cudaGetLastError());
+            */
 
             //inizializzo l'offset per le cellule per trovare la corrispettiva stazione di lavoro
             int offset_alive_cell = 0;
@@ -418,6 +440,7 @@ void simulazione(
                 alive_cells_d,
                 n_cell_alive_d,
                 n_cell_alive_h,
+                support_vector_d,
                 0
             );
             CUDA_CHECK(cudaGetLastError());
@@ -432,6 +455,7 @@ void simulazione(
                 //CUDA_CHECK(cudaGetLastError());
 
                 cudaMemcpy(world_rgb_h, world_rgb_d, tot_world_dim_size_float * 3, cudaMemcpyDeviceToHost);
+                CUDA_CHECK(cudaGetLastError());
 
                 // Carica i dati nella texture OpenGL
                 glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, world_dim, world_dim, GL_RGB, GL_FLOAT, world_rgb_h);
@@ -547,7 +571,7 @@ void simulazione(
         cuda_memcpy(model_biases_d, new_model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
-        if(epoca%checkpoint_epoch==0 || epoca==N_EPHOCS){
+        if((epoca != 0 && epoca%checkpoint_epoch == 0) || epoca == (N_EPHOCS - 1)){
             // - Ritorno vettore nuovi pesi creature
             cuda_memcpy(model_weights_h, new_model_weights_d, tot_models_weight_size, cudaMemcpyDeviceToHost, cc_major, 0);
             CUDA_CHECK(cudaGetLastError());

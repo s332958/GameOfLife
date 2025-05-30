@@ -416,14 +416,13 @@ void launch_find_index_cell_alive(
     int *alive_cell_vector,
     int *n_cell_alive_d,
     int *n_cell_alive_h,
+    int *support_vector_d,
     cudaStream_t stream
 ) {
     int n_thread = 1024;
     if(world_dim_tot<n_thread) n_thread = world_dim_tot;
     int n_block = (world_dim_tot+n_thread-1) / n_thread;
 
-    int *support_vector;
-    cudaMalloc((void**) &support_vector, world_dim_tot*sizeof(int));
 
     cudaMemsetAsync(n_cell_alive_d, 0, sizeof(int),stream);
 
@@ -441,7 +440,7 @@ void launch_find_index_cell_alive(
 
     compact_cell_alive_kernel_pt1<<<n_block,n_thread,sizeof(int)*(n_thread*2+1),stream>>>(
         alive_cell_vector,
-        support_vector,
+        support_vector_d,
         n_cell_alive_d,
         world_dim_tot
     );
@@ -452,14 +451,12 @@ void launch_find_index_cell_alive(
     for(int i=0; i<n_block_pt1; i++){
         compact_cell_alive_kernel_pt2<<<1,n_thread,0,stream>>>(
             alive_cell_vector,
-            support_vector,
+            support_vector_d,
             n_cell_alive_d,
             i,
             block_dim_pt1
         );
     }
-
-    cudaFree(support_vector);
 
 
 }

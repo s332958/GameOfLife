@@ -25,6 +25,7 @@ void launch_find_index_cell_alive(
     int *alive_cell_vector,
     int *n_cell_alive_d,
     int *n_cell_alive_h,
+    int *support_vector_d,
     cudaStream_t stream
 );
 
