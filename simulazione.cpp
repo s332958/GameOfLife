@@ -25,8 +25,8 @@ void simulazione(
     GLFWwindow* window, GLuint textureID
 ) {
 
-    int input_size = model_structure[0];
-    int output_size = model_structure[n_layer-1];
+    // int input_size = model_structure[0];
+    //int output_size = model_structure[n_layer-1];
 
 
     // -------------------------------------------
@@ -133,11 +133,11 @@ void simulazione(
     int dim_max_layer = model_structure[i_max];
     int dim_input = model_structure[0];
     int dim_output = model_structure[n_layer - 1];
-    size_t dim_workspace = dim_max_layer  * sizeof(float);
+    size_t workspace_size = dim_max_layer  * sizeof(float);
 
     // compute n_workspace using all free memory avaible
     computeFreeMemory(&free_mem);
-    int n_workspace = (free_mem > reserve_free_memory) ? (free_mem - reserve_free_memory) / dim_workspace : 0;
+    int n_workspace = (free_mem > reserve_free_memory) ? (free_mem - reserve_free_memory) / workspace_size : 0;
 
     // if are not allocate workspace return error
     if (n_workspace == 0) {
@@ -149,11 +149,11 @@ void simulazione(
 
     std::cout << "Free memory: " << free_mem << " bytes\n";
     std::cout << "Reserved memory: " << reserve_free_memory << " bytes\n";
-    std::cout << "Workspace size per slot: " << dim_workspace << " bytes\n";
+    std::cout << "Workspace size per slot: " << workspace_size << " bytes\n";
     std::cout << "Allocate " << n_workspace << " workspace slots for the simulation.\n";
 
     // allocazione workspace
-    float *workspace_input_d  = (float*) cuda_allocate(n_workspace * dim_workspace, cc_major, 0);
+    float *workspace_input_d  = (float*) cuda_allocate(n_workspace * workspace_size, cc_major, 0);
     // float *workspace_output_d = (float*) cuda_allocate(n_workspace * dim_workspace, cc_major, 0);
 
     computeFreeMemory(&free_mem);
@@ -295,7 +295,7 @@ void simulazione(
             // reset matrice dei contributi e workspace 
             launch_reset_kernel<float>(world_contributions_d, world_dim * world_dim * n_creature, 0);
             CUDA_CHECK(cudaGetLastError());
-            launch_reset_kernel<float>(workspace_input_d, n_workspace*input_size, 0);
+            launch_reset_kernel<float>(workspace_input_d, n_workspace*dim_max_layer, 0);
             CUDA_CHECK(cudaGetLastError());
 
             //inizializzo l'offset per le cellule per trovare la corrispettiva stazione di lavoro
@@ -306,8 +306,8 @@ void simulazione(
 
                 for(int workspace_idx=0; workspace_idx<max && offset_alive_cell<*n_cell_alive_h; workspace_idx++){
 
-                    int offset_workspace_in = input_size*workspace_idx;
-                    int offset_workspace_out = output_size*workspace_idx;
+                    int offset_workspace_in = dim_max_layer*workspace_idx;
+                    // int offset_workspace_out = output_size*workspace_idx;
                     int stream_id = workspace_idx % n_stream;
 
                     launch_vision(
@@ -348,7 +348,7 @@ void simulazione(
                         alive_cells_d,
                         world_dim,
                         n_creature,
-                        output_size,
+                        dim_output,
                         offset_alive_cell,
                         streams[stream_id]
                     );
@@ -392,11 +392,11 @@ void simulazione(
             // se il render è attivo genero la schermata con openGL
             if(render){
 
-                //launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, 0);
-                //CUDA_CHECK(cudaGetLastError());
-
-                launch_mappa_signal(world_value_d, world_id_d, world_signal_d, world_rgb_d, world_dim, n_creature, 0);
+                launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, 0);
                 CUDA_CHECK(cudaGetLastError());
+
+                //launch_mappa_signal(world_value_d, world_id_d, world_signal_d, world_rgb_d, world_dim, n_creature, 0);
+                //CUDA_CHECK(cudaGetLastError());
 
                 cudaMemcpy(world_rgb_h, world_rgb_d, tot_world_dim_size_float * 3, cudaMemcpyDeviceToHost);
 

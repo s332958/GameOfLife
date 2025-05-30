@@ -126,7 +126,7 @@ __global__ void world_update_kernel(
                 // se la cella è occupata ma la forza nemica è inferiore ad alleati + corrente si calcola solo la somma tra alleata corrente e - nemici e questo è il nuovo risultato
                 final_value = starting_value + ally_energy - enemy_energy;
             }
-            final_value = final_value - 0.0005;    
+            final_value = final_value - 0.001;    
         }    
         
         // se il valore finale ha una soglia troppo bassa allora l'energia va al mondo
