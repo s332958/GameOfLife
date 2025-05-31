@@ -222,6 +222,8 @@ __global__ void compute_energy_and_occupation_kernel(
 
 // ==================================================================================
 
+// PREMESSA:
+// la struttura dei blocchi è importante, il numero di thread dentro ad un blocco, indica il numero di pesi/biases che ogni blocco genetico possiede
 __global__ void recombine_models_kernel(
     float *weights, float *biases,
     float *new_weights, float *new_biases,
@@ -236,11 +238,14 @@ __global__ void recombine_models_kernel(
     // Calcolo indice thread
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int total_genes = num_weights_per_model + num_bias_per_model;
+    // faccio una return dei thread che superano la somma di pesi+biases
     if (idx >= total_genes) return;
 
+    // creazione d curandstate per generare valori casuali su device
     curandState state;
     curand_init(seed, idx, 0, &state);
 
+    // il primo thread di ogni blocco si occupa di generare il numero del genitore del blocco genetico
     if(threadIdx.x==0){
         int gen = curand(&state) % 2;
         gen_id = gen==0?model1_idx:model2_idx;
@@ -250,31 +255,44 @@ __global__ void recombine_models_kernel(
 
     int idx_model_param_gen = -1;
 
+    // caso in cui stiamo analizzando i pesi (indice < numero pesi modello)
     if (idx < num_weights_per_model) {
 
+        // calcolo l'indice dei geni (pesi singoli) dal blocco genetico del genitore
         idx_model_param_gen = (gen_id * num_weights_per_model) + idx;
 
+        // carico il valore del gene 
         float gene_value = weights[idx_model_param_gen];
 
+        // genero un numero casuale per definire se il gene subisce una mutazione (caso per cui viene superata la soglia di mutazione)
         if (curand_uniform(&state) > mutation_prob) {
+            // calcolo il delta della variazione che va da -mutation_range a mutation_range
             float delta = (curand_uniform(&state) * 2.0f - 1.0f) * mutation_range;
+            // applico il delta
             gene_value += delta;
         }
-
+        // trovo l'indice per scrivere il nuovo valore sul nuovo modello e lo aggiorno
         int idx_model_param_out = (output_idx * num_weights_per_model + idx);
         new_weights[idx_model_param_out] = gene_value;
 
     }else{
 
+        //caso in cui siamo nei bias (indice > numero peso modelli) 
+        //calcolo indice gene genitore come per i pesi ma si toglie l'offset del numero di pesi (questo perche i thread dei biases sono tutti dopo i pesi)
         idx_model_param_gen = (gen_id * num_bias_per_model) + idx - num_weights_per_model;
 
+        // carico il valore del gene in un registro
         float gene_value = biases[idx_model_param_gen];
 
-        if (curand_uniform(&state) < mutation_prob) {
+        // genero un valore casuale che se supera la soglia allora indica la mutazione del gene
+        if (curand_uniform(&state) > mutation_prob) {
+            // calcolo il valore di mutzione del gene come fatto in precedenza 
             float delta = (curand_uniform(&state) * 2.0f - 1.0f) * mutation_range;
+            // aggiorno il valore del nuovo gene
             gene_value += delta;
         }
 
+        // trovo l'indice su dove va scritto il bias appena calcolato e lo aggiorno
         int idx_model_param_out = (output_idx * num_bias_per_model) + idx - num_weights_per_model;
         new_biases[idx_model_param_out] = gene_value;
 
