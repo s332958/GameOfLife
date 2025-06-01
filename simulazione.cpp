@@ -14,6 +14,8 @@
 #include <cuda_runtime.h>
 #include <cmath>
 #include <unistd.h> 
+#include <time.h>
+#include <iomanip>
 
 
 
@@ -30,7 +32,7 @@ void simulazione(
     //  -----------------------------------------
     //
     //  -----------------------------------------
-    int checkpoint_epoch = 10;
+    int checkpoint_epoch = 1;
     
     float PN_scale_obstacles = 10.0f;
     float PN_threshold_obstacles = 0.85f;
@@ -38,17 +40,19 @@ void simulazione(
     float PN_scale_food = 8.0f;
     float PN_threshold_food = 0.90f;
     float random_threshold_food = 0.99f;
-
-
-    float fraction_recombination = 0.4f;
     
-    float gen_x_block = 0.2f;
-    float mutation_probability = 0.10f;
-    float mutation_range = 0.10f;
+    float starting_value = 9.0f;
+    float energy_fraction = (1.0f / 9.0f) / 2.0f;
+    float energy_decay = 0.00075f;
 
-    int clean_window_size = 7;
+    float winners_fraction = 0.6f;
+    float recombination_newborns_fraction = 0.35f;
+    
+    float gen_x_block = 0.5f;
+    float mutation_probability = 0.0f;
+    float mutation_range = 1.0f;
 
-
+    int clean_window_size = 11;
 
     // parametrizzare food e obstacles, mutazioni randomiche, soglia di ricombinazione
 
@@ -56,8 +60,10 @@ void simulazione(
     // mettere array di supporto all'inizio e si passa come argomento 
 
 
+    clock_t start;
+    clock_t end;
 
-
+    unsigned long seed = (unsigned long)time(NULL);
 
     // -------------------------------------------
     // PRE-FASE : Info GPU
@@ -194,9 +200,9 @@ void simulazione(
     if(biases_models==nullptr && weights_models==nullptr){
 
         // Generation random models
-        launch_fill_random_kernel(model_weights_d,n_weight*n_creature,-1.0f,1.0f,0, 0);
+        launch_fill_random_kernel(model_weights_d,0,n_weight*n_creature,-1.0f,1.0f,seed, 0);
         CUDA_CHECK(cudaGetLastError());
-        launch_fill_random_kernel(model_biases_d,n_bias*n_creature,-1.0f,1.0f,0, 0);
+        launch_fill_random_kernel(model_biases_d,0,n_bias*n_creature,-1.0f,1.0f,seed+1, 0);
         CUDA_CHECK(cudaGetLastError());
 
         // Load on CPU vettore pesi tutti i modelli (world_weights_h è vettore host con dati)
@@ -273,7 +279,7 @@ void simulazione(
                 random_index = rand() % (world_dim*world_dim);
             }
             if(world_id_h[random_index] == 0){
-                world_value_h[random_index] = 1;
+                world_value_h[random_index] = starting_value;
                 world_id_h[random_index] = i + 1;
                 alive_cells_h[i] = random_index;
                 *n_cell_alive_h += 1;
@@ -322,15 +328,15 @@ void simulazione(
 
         /*======================================================================================================================================*/
         for(int step=0; step<N_STEPS && *n_cell_alive_h > 0; step++){
-            printf("CELLULE VIVE = %d \n",*n_cell_alive_h);
+            start = clock();
+            //printf("CELLULE VIVE = %d \n",*n_cell_alive_h);
             // attivazione del render se il flag è attivo
             if(render){
                 if (glfwWindowShouldClose(window)) {
                     std::cout << "Finestra chiusa. Terminazione del programma." << std::endl;
                     goto fine;
                 }
-            }
-            std::cout << "Step: " << epoca << "." << step << "\n";
+            }            
 
             // -------------------------------------------
             // FASE 2 : calcolo step 
@@ -403,6 +409,7 @@ void simulazione(
                         n_creature,
                         dim_output,
                         offset_alive_cell,
+                        energy_fraction,
                         streams[stream_id]
                     );
                     CUDA_CHECK(cudaGetLastError());
@@ -430,9 +437,11 @@ void simulazione(
                 world_dim,
                 n_creature,
                 n_cell_alive_d,
+                energy_decay,
                 0
             );
             CUDA_CHECK(cudaGetLastError());
+
 
             launch_find_index_cell_alive(
                 world_id_d,
@@ -448,11 +457,11 @@ void simulazione(
             // se il render è attivo genero la schermata con openGL
             if(render){
 
-                launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, 0);
-                CUDA_CHECK(cudaGetLastError());
-
-                //launch_mappa_signal(world_value_d, world_id_d, world_signal_d, world_rgb_d, world_dim, n_creature, 0);
+                //launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, 0);
                 //CUDA_CHECK(cudaGetLastError());
+
+                launch_mappa_signal(world_value_d, world_id_d, world_signal_d, world_rgb_d, world_dim, n_creature, 0);
+                CUDA_CHECK(cudaGetLastError());
 
                 cudaMemcpy(world_rgb_h, world_rgb_d, tot_world_dim_size_float * 3, cudaMemcpyDeviceToHost);
                 CUDA_CHECK(cudaGetLastError());
@@ -507,16 +516,19 @@ void simulazione(
 
             }
             */
-
+            end = clock();  // End time
+            std::cout << "Step: " << epoca << "." << step << " " << *n_cell_alive_h << "  |" << std::fixed << std::setprecision(1) << 1.0f/((float)(end - start) / CLOCKS_PER_SEC) << " it/s" << "\n";
         }
 
         // -------------------------------------------
         // FASE 3 : generazione nuove creature 
         // -------------------------------------------
 
+        seed = (unsigned long)time(NULL);
 
         // imposto una percentuale di quante creature voglio tenere per la rimescolazione genetica
-        int limit = n_creature * fraction_recombination;
+        int limit_winner = n_creature * winners_fraction;
+        int limit_recombination = n_creature * recombination_newborns_fraction;
 
         // - spostamento vettore energia su HOST
         cuda_memcpy(energy_vector_h,energy_vector_d,tot_energy_vector_size,cudaMemcpyDeviceToHost,cc_major, 0);
@@ -529,18 +541,20 @@ void simulazione(
         if(METHOD_EVAL==0) argsort_bubble(energy_vector_h,creature_ordered_h,n_creature);
         if(METHOD_EVAL==1) argsort_bubble(occupation_vector_h,creature_ordered_h,n_creature);
 
+        /*
         printf("-----------------------------PUNTEGGI CREATURE----------------------\n");
         for(int i=0; i<n_creature; i++) printf("%3d) energy: %.6f occupation: %.6f\n",i+1,energy_vector_h[i],occupation_vector_h[i]);
         printf("-----------------------------END PUNTEGGI CREATURE----------------------\n");
-        printf("CREATURE ORDER, LIMIT(%d): \n",limit);
+        printf("CREATURE ORDER, LIMIT_winner(%d): \n",limit_winner);
         for(int i=0; i<n_creature; i++) printf("%3d ",creature_ordered_h[i]+1);
         printf("\n");
+        */
 
         // - Creazione nuove creature 
-        for(int i=0;i<n_creature;i++){
+        for(int i=0;i<limit_recombination;i++){
 
-            int idx1 = get_random_int(0,limit);
-            int idx2 = get_random_int(0,limit);
+            int idx1 = get_random_int(0,limit_winner);
+            int idx2 = get_random_int(0,limit_winner);
             int gen1 = creature_ordered_h[idx1];
             int gen2 = creature_ordered_h[idx2];
 
@@ -557,12 +571,23 @@ void simulazione(
                 gen_x_block, 
                 mutation_probability, 
                 mutation_range, 
-                0, 
+                seed, 
                 0
             );
             CUDA_CHECK(cudaGetLastError());
 
         }
+
+        
+        // Generation random models
+        launch_fill_random_kernel(model_weights_d,n_weight*limit_recombination,n_weight*n_creature,-1.0f,1.0f,seed + 1, 0);
+        CUDA_CHECK(cudaGetLastError());
+        launch_fill_random_kernel(model_biases_d,n_bias*limit_recombination,n_bias*n_creature,-1.0f,1.0f,seed + 2, 0);
+        CUDA_CHECK(cudaGetLastError());
+
+
+        cudaDeviceSynchronize();
+
 
         // - Load vettore nuovi pesi su vettore vecchi pesi
         cuda_memcpy(model_weights_d, new_model_weights_d, tot_models_weight_size, cudaMemcpyDeviceToDevice, cc_major, 0);
@@ -581,7 +606,7 @@ void simulazione(
 
             save_model_on_file("models/file1.txt",model_structure,n_layer,model_weights_h,model_biases_h,n_weight,n_bias,n_creature);
             printf("MODEL GENERATE AND SAVE \n");
-        }
+        }       
 
     }
 

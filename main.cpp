@@ -1,6 +1,7 @@
 
 #include "simulazione.h"
 #include "libs/mappa_colori.cuh"
+#include "libs/utils_cpu.h"
 
 #include <GLFW/glfw3.h>
 
@@ -14,10 +15,12 @@
 #include <format>
 
 //cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
-const int n_layer = 5;
-int model_structure [n_layer] = {162, 200, 25, 20, 10};
+const int n_layer = 4;
+int model_structure [n_layer] = {18, 10, 10, 10};
 float * weights_models = nullptr; 
 float * biases_models = nullptr; 
+
+bool load = false;
 
 size_t reserve_free_memory = 1024 * 1024 * 300; // * 1024;// 1GB
 
@@ -74,6 +77,10 @@ int main(int argc, char* argv[]) {
             // reserve Mb of free memory for don't sature the GPU
             reserve_free_memory = std::atoi(argv[i+1]) * 1024 * 1024;
         }
+        if(arg == "-load"){
+            // reserve Mb of free memory for don't sature the GPU
+            load = std::atoi(argv[i+1]) != 0;
+        }
     }
     
     //fuori dal ciclo
@@ -117,6 +124,24 @@ int main(int argc, char* argv[]) {
         //creazione colori
         load_constant_memory_GPU(n_creature);
     }
+
+    if (load){
+        int n_weight = 0;
+        int n_bias = 0;
+    
+        for(int i = 0; i < n_layer - 1; ++i) {
+            n_weight += model_structure[i] * model_structure[i + 1];
+            n_bias += model_structure[i + 1];
+        }
+        size_t tot_models_weight_size = n_creature * n_weight * sizeof(float);
+        size_t tot_models_bias_size = n_creature * n_bias * sizeof(float);
+    
+        weights_models = (float*) malloc(tot_models_weight_size);
+        biases_models = (float*) malloc(tot_models_bias_size);
+    
+        load_model_from_file("models/file1.txt", weights_models, biases_models, n_weight, n_bias, n_creature);
+    }
+
 
 
     simulazione(

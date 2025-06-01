@@ -47,7 +47,8 @@ __global__ void world_update_kernel(
     int dim_world, 
     int number_of_creatures, 
     int *cellCount, 
-    int *cells
+    int *cells,
+    float energy_decay
 )
     {                 
         int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -61,7 +62,7 @@ __global__ void world_update_kernel(
         
         // se l'ID è -1 ovvero un ostacolo ritorno
         if(ID == -1) {
-            world_signal[index] = -1;
+            world_value[index] = -1;
             return;
         }
         
@@ -126,7 +127,7 @@ __global__ void world_update_kernel(
                 // se la cella è occupata ma la forza nemica è inferiore ad alleati + corrente si calcola solo la somma tra alleata corrente e - nemici e questo è il nuovo risultato
                 final_value = starting_value + ally_energy - enemy_energy;
             }
-            final_value = final_value - 0.001;    
+            final_value = final_value - energy_decay;    
         }    
         
         // se il valore finale ha una soglia troppo bassa allora l'energia va al mondo
@@ -203,6 +204,7 @@ void launch_world_update(
     int world_dim, 
     int number_of_creatures,
     int *cellCount, 
+    float energy_decay,
     cudaStream_t stream
 ){
 
@@ -219,7 +221,8 @@ void launch_world_update(
         world_dim,
         number_of_creatures,
         cellCount,
-        cells
+        cells,
+        energy_decay
     );
     if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori world_update_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
     

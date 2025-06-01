@@ -1,4 +1,5 @@
 #include <cuda_runtime.h>
+#include <sstream>
 #include <iostream>
 #include <fstream>
 #include <random>
@@ -110,7 +111,7 @@ void save_model_on_file(
     int dim_bias,
     int n_modelli)
 {
-    std::ofstream out(nome_file, std::ios::app);
+    std::ofstream out(nome_file);
     if (!out.is_open()) {
         throw std::runtime_error("Impossibile aprire il file per la scrittura.");
     }
@@ -144,6 +145,57 @@ void save_model_on_file(
 
     out.close();
 }
+
+void load_model_from_file(
+    const std::string& nome_file,
+    float* pesi_totale,
+    float* bias_totale,
+    int dim_pesi,
+    int dim_bias,
+    int n_modelli)
+{
+    std::ifstream in(nome_file);
+    if (!in.is_open()) {
+        throw std::runtime_error("Impossibile aprire il file per la lettura.");
+    }
+
+    std::string line;
+    int modello = 0;
+    int pesi_offset = 0;
+    int bias_offset = 0;
+
+    while (std::getline(in, line) && modello < n_modelli) {
+        // Riga 1: struttura modello (ignorata)
+        // Salta senza fare nulla
+        // std::cout << "Struct: " << line << std::endl;
+
+        // Riga 2: pesi
+        std::getline(in, line);
+        std::istringstream pesi_stream(line);
+        for (int i = 0; i < dim_pesi; ++i) {
+            pesi_stream >> pesi_totale[pesi_offset + i];
+        }
+
+        // Riga 3: bias
+        std::getline(in, line);
+        std::istringstream bias_stream(line);
+        for (int i = 0; i < dim_bias; ++i) {
+            bias_stream >> bias_totale[bias_offset + i];
+        }
+
+        // Skip 3 righe vuote
+        std::getline(in, line);
+        std::getline(in, line);
+        std::getline(in, line);
+
+        modello++;
+        pesi_offset += dim_pesi;
+        bias_offset += dim_bias;
+    }
+
+    in.close();
+}
+
 
 
 // Funzione per salvare mappa su file

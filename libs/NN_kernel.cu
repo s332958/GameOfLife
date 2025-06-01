@@ -31,8 +31,11 @@ __global__ void vision_kernel(
 
     if (x >= raggio || y >= raggio) return;
 
-    int center_row = *cell_idx / dim_world;
-    int center_col = *cell_idx % dim_world;
+    int cell_index = *cell_idx;
+    int ID_cell = world_id[cell_index];
+
+    int center_row = cell_index / dim_world;
+    int center_col = cell_index % dim_world;
 
     // Calcola coordinate "virtuali" senza wrapping
     int world_row = (center_row - (raggio / 2) + y + dim_world) % dim_world;
@@ -42,8 +45,14 @@ __global__ void vision_kernel(
     //printf("thread: %d \n",offset);
 
     int world_pos = world_row * dim_world + world_col;
+    int ID_vision = world_id[world_pos];
+
     workspace_addr[offset + 0] = world_value[world_pos];
-    workspace_addr[offset + 1] = world_signaling[world_pos];
+    if(ID_cell == ID_vision){
+        workspace_addr[offset + 1] = world_signaling[world_pos];
+    }else{
+        workspace_addr[offset + 1] = - world_signaling[world_pos];
+    }
 }
 
 // ============================================================================
@@ -138,7 +147,8 @@ __global__ void output_elaboration_kernel(
     int world_dim, 
     int number_of_creatures,
     int output_size,
-    int cell_index
+    int cell_index,
+    float frazione_di_se_stesso
 ){  
     //indice del thread
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -159,8 +169,8 @@ __global__ void output_elaboration_kernel(
 
     //l'ultimo thread va a modificare il mondo di signaling 
     if(output_index == output_size-1){
-        float signal = (1/number_of_creatures)*(ID-1)+(output/number_of_creatures);
-        world_signal[center_index] = signal;
+        //float signal = (1/number_of_creatures)*(ID-1)+(output/number_of_creatures);
+        world_signal[center_index] = output;
         return;
     }
 
@@ -182,8 +192,6 @@ __global__ void output_elaboration_kernel(
     // trovo l'indice nel mondo della cella modificata
     int filter_index = (world_dim * world_dim * (ID - 1)) + (filter_y * world_dim) + filter_x;
 
-    // indico un max di quanto ogni cella puo donare del suo valore max
-    float frazione_di_se_stesso = 1.0/36.0;
 
     // calcolo il valore finale da mettere nella cella dei contributi
     float final_output = center_value * frazione_di_se_stesso * output;
@@ -433,6 +441,7 @@ void launch_output_elaboration(                                 // Funziona e te
     int number_of_creatures,                        // numero di creature massime nel mondo
     int output_size,                                // dimensione dell'output
     int cell_index,                                 // indice cella viva in analisi
+    float energy_fraction,
     cudaStream_t stream
 ){
     int n_thread_per_block = 1024;
@@ -449,7 +458,8 @@ void launch_output_elaboration(                                 // Funziona e te
         world_dim,
         number_of_creatures,
         output_size,
-        cell_index
+        cell_index,
+        energy_fraction
     );
     if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori output_elaboration_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
     

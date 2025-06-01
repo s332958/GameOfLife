@@ -17,6 +17,7 @@ void launch_world_update(float* world_value,
                          int world_dim, 
                          int number_of_creatures,
                          int* cellCount, 
+                         float energy_decay,
                          cudaStream_t stream);
 
 void launch_find_index_cell_alive(

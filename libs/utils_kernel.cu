@@ -7,9 +7,10 @@
 
 // ============================================================================
 
-__global__ void fill_random_kernel(float* d_vec, int n, float minVal, float maxVal, unsigned long seed) {
+__global__ void fill_random_kernel(float* d_vec, int start, int finish, float minVal, float maxVal, unsigned long seed) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= n) return;
+    if (idx >= finish - start) return;
+    idx = idx + start;
 
     // Setup generator per thread
     curandState state;
@@ -22,13 +23,14 @@ __global__ void fill_random_kernel(float* d_vec, int n, float minVal, float maxV
 
 
 // Wrapper: fill vettore random con calcolo griglia/thread
-void launch_fill_random_kernel(float* d_vec, int n, float minVal, float maxVal,
+void launch_fill_random_kernel(float* d_vec, int start, int finish, float minVal, float maxVal,
                                 unsigned long seed, cudaStream_t stream) {
 
-    int threads = 256;
+    int threads = 1024;
+    int n = finish - start;
     int blocks = (n + threads - 1) / threads;
 
-    fill_random_kernel<<<blocks, threads, 0, stream>>>(d_vec, n, minVal, maxVal, seed);
+    fill_random_kernel<<<blocks, threads, 0, stream>>>(d_vec, start, finish, minVal, maxVal, seed);
 
 }
 template <typename T>
@@ -40,7 +42,7 @@ __global__ void resetKernel(T* d_vec, int n) {
 
 template <typename T>
 void launch_reset_kernel(T* d_vec, int n, cudaStream_t stream) {
-    int threads = 256;
+    int threads = 1024;
     int blocks = (n + threads - 1) / threads;
     resetKernel<T><<<blocks, threads, 0, stream>>>(d_vec, n);
 }

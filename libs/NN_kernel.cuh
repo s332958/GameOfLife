@@ -40,6 +40,7 @@ void launch_output_elaboration(
     int number_of_creatures,
     int output_size,
     int cell_index,
+    float energy_fraction,
     cudaStream_t stream
 );
 

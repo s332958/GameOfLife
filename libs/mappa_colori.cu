@@ -85,7 +85,8 @@ __global__ void mappa_signal_kernel(float * mondo_value, int* id_matrix, float* 
 
     int ID = id_matrix[pixel_index];
     float value = mondo_signal[pixel_index];
-    float signal = (value - (1/n_creature)*(ID-1))*n_creature;
+    float signal = value;
+    //(value - (1/n_creature)*(ID-1))*n_creature;
 
 
     int out_index = pixel_index * 3 + channel;
