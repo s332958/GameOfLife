@@ -273,12 +273,13 @@ __global__ void recombine_models_kernel(
         float gene_value = weights[idx_model_param_gen];
 
         // genero un numero casuale per definire se il gene subisce una mutazione (caso per cui viene superata la soglia di mutazione)
-        if (curand_uniform(&state) > mutation_prob) {
+        if (curand_uniform(&state) < mutation_prob) {
             // calcolo il delta della variazione che va da -mutation_range a mutation_range
             float delta = (curand_uniform(&state) * 2.0f - 1.0f) * mutation_range;
             // applico il delta
             gene_value += delta;
         }
+
         // trovo l'indice per scrivere il nuovo valore sul nuovo modello e lo aggiorno
         int idx_model_param_out = (output_idx * num_weights_per_model + idx);
         new_weights[idx_model_param_out] = gene_value;
@@ -293,7 +294,7 @@ __global__ void recombine_models_kernel(
         float gene_value = biases[idx_model_param_gen];
 
         // genero un valore casuale che se supera la soglia allora indica la mutazione del gene
-        if (curand_uniform(&state) > mutation_prob) {
+        if (curand_uniform(&state) < mutation_prob) {
             // calcolo il valore di mutzione del gene come fatto in precedenza 
             float delta = (curand_uniform(&state) * 2.0f - 1.0f) * mutation_range;
             // aggiorno il valore del nuovo gene

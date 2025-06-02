@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 #include <stdio.h>
+#include <iostream>
 
 
 
@@ -10,14 +11,16 @@
 __global__ void fill_random_kernel(float* d_vec, int start, int finish, float minVal, float maxVal, unsigned long seed) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= finish - start) return;
-    idx = idx + start;
+
+    int real_idx = idx + start;
 
     // Setup generator per thread
     curandState state;
     curand_init(seed, idx, 0, &state);
 
     float rand_uniform = curand_uniform(&state); // [0,1)
-    d_vec[idx] = minVal + rand_uniform * (maxVal - minVal);
+
+    d_vec[real_idx] = minVal + rand_uniform * (maxVal - minVal);
 }
 
 

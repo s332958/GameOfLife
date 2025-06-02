@@ -43,14 +43,14 @@ void simulazione(
     
     float starting_value = 9.0f;
     float energy_fraction = (1.0f / 9.0f) / 2.0f;
-    float energy_decay = 0.00075f;
+    float energy_decay = 0.001f;
 
-    float winners_fraction = 0.6f;
-    float recombination_newborns_fraction = 0.35f;
+    float winners_fraction = 0.45f;
+    float recombination_newborns_fraction = 0.75f;
     
-    float gen_x_block = 0.5f;
-    float mutation_probability = 0.0f;
-    float mutation_range = 1.0f;
+    float gen_x_block = 0.005f;
+    float mutation_probability = 0.02f;
+    float mutation_range = 0.4f;
 
     int clean_window_size = 11;
 
@@ -197,21 +197,30 @@ void simulazione(
     printf("END ALLOCATIONS\n");
 
     // CARIMENTO DATI
-    if(biases_models==nullptr && weights_models==nullptr){
-
+    if(biases_models==nullptr && weights_models==nullptr){       
+        
         // Generation random models
         launch_fill_random_kernel(model_weights_d,0,n_weight*n_creature,-1.0f,1.0f,seed, 0);
         CUDA_CHECK(cudaGetLastError());
         launch_fill_random_kernel(model_biases_d,0,n_bias*n_creature,-1.0f,1.0f,seed+1, 0);
         CUDA_CHECK(cudaGetLastError());
 
+        /*
+        (per debuggare)        
+        cudaMemset(model_weights_d, 0, n_weight*5*sizeof(float));    
+        CUDA_CHECK(cudaGetLastError());          
+        
+        cudaMemset(model_biases_d,0, n_bias*5*sizeof(float));    
+        CUDA_CHECK(cudaGetLastError());      
+        */
+        
         // Load on CPU vettore pesi tutti i modelli (world_weights_h è vettore host con dati)
         cuda_memcpy(model_weights_h, model_weights_d, tot_models_weight_size, cudaMemcpyDeviceToHost, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
         // Load on CPU vettore bias tutti i modelli (world_biases_h è vettore host con dati)
         cuda_memcpy(model_biases_h, model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToHost, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
-
+        
         save_model_on_file("models/file1.txt",model_structure,n_layer,model_weights_h,model_biases_h,n_weight,n_bias,n_creature);
 
         printf("FINE GENERAZIONE MODELLI \n");
@@ -537,10 +546,19 @@ void simulazione(
         cuda_memcpy(occupation_vector_h,occupation_vector_d,tot_occupation_vector_size,cudaMemcpyDeviceToHost,cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
-        // - Ordinamento punteggi creature
-        if(METHOD_EVAL==0) argsort_bubble(energy_vector_h,creature_ordered_h,n_creature);
-        if(METHOD_EVAL==1) argsort_bubble(occupation_vector_h,creature_ordered_h,n_creature);
+        float tot_score = 0;
 
+        // - Ordinamento punteggi creature
+        if(METHOD_EVAL==0){
+            tot_score = argsort_bubble(energy_vector_h,creature_ordered_h,n_creature);
+        } 
+        if(METHOD_EVAL==1){
+            tot_score = argsort_bubble(occupation_vector_h,creature_ordered_h,n_creature); 
+        } 
+        
+        tot_score = tot_score / n_creature;
+
+        append_score_to_file("log_score.txt", tot_score);
         /*
         printf("-----------------------------PUNTEGGI CREATURE----------------------\n");
         for(int i=0; i<n_creature; i++) printf("%3d) energy: %.6f occupation: %.6f\n",i+1,energy_vector_h[i],occupation_vector_h[i]);
@@ -548,16 +566,29 @@ void simulazione(
         printf("CREATURE ORDER, LIMIT_winner(%d): \n",limit_winner);
         for(int i=0; i<n_creature; i++) printf("%3d ",creature_ordered_h[i]+1);
         printf("\n");
+        
         */
+        int first_ID = creature_ordered_h[0];
+        if (first_ID < 0 || first_ID >= n_creature) {
+            std::cerr << "Errore: first_ID fuori range: " << first_ID << "\n";
+        }
+        //il primo vince sempre
+        cuda_memcpy(new_model_weights_d, model_weights_d + n_weight * first_ID, n_weight * sizeof(float), cudaMemcpyDeviceToDevice, cc_major, 0);
+        CUDA_CHECK(cudaGetLastError());
+        
+        cuda_memcpy(new_model_biases_d, model_biases_d + n_bias * first_ID, n_bias * sizeof(float), cudaMemcpyDeviceToDevice, cc_major, 0);
+        CUDA_CHECK(cudaGetLastError());  
+
+    
 
         // - Creazione nuove creature 
-        for(int i=0;i<limit_recombination;i++){
+        for(int i=1;i<limit_recombination;i++){
 
             int idx1 = get_random_int(0,limit_winner);
             int idx2 = get_random_int(0,limit_winner);
             int gen1 = creature_ordered_h[idx1];
             int gen2 = creature_ordered_h[idx2];
-
+            
             launch_recombine_models_kernel(
                 model_weights_d,
                 model_biases_d,
@@ -575,15 +606,16 @@ void simulazione(
                 0
             );
             CUDA_CHECK(cudaGetLastError());
+            
 
-        }
-
+        }              
         
         // Generation random models
-        launch_fill_random_kernel(model_weights_d,n_weight*limit_recombination,n_weight*n_creature,-1.0f,1.0f,seed + 1, 0);
+        launch_fill_random_kernel(new_model_weights_d,n_weight*limit_recombination,n_weight*n_creature,-1.0f,1.0f,seed + 1, 0);
         CUDA_CHECK(cudaGetLastError());
-        launch_fill_random_kernel(model_biases_d,n_bias*limit_recombination,n_bias*n_creature,-1.0f,1.0f,seed + 2, 0);
+        launch_fill_random_kernel(new_model_biases_d,n_bias*limit_recombination,n_bias*n_creature,-1.0f,1.0f,seed + 2, 0);
         CUDA_CHECK(cudaGetLastError());
+        
 
 
         cudaDeviceSynchronize();

@@ -140,6 +140,11 @@ int main(int argc, char* argv[]) {
         biases_models = (float*) malloc(tot_models_bias_size);
     
         load_model_from_file("models/file1.txt", weights_models, biases_models, n_weight, n_bias, n_creature);
+    }else{        
+
+        std::ofstream out("log_score.txt", std::ios::trunc);  // apre e svuota il file
+        out.close();
+
     }
 
 

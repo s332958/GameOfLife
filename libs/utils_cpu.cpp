@@ -3,12 +3,17 @@
 #include <iostream>
 #include <fstream>
 #include <random>
+#include <string>
+#include <stdexcept>
 
 template <typename T>
-void argsort_bubble(T *vettore, int *indice, int n) {
-    for (int i = 0; i < n; i++) indice[i] = i;
-
-    for (int i = 0; i < n - 1; i++) {
+float argsort_bubble(T *vettore, int *indice, int n) {
+    float sum = 0;
+    for (int i = 0; i < n; i++) {
+        indice[i] = i;
+        sum += vettore[i];         
+    }
+    for (int i = 0; i < n - 1; i++) {        
         for (int j = 0; j < n - i - 1; j++) {
             if (vettore[indice[j]] < vettore[indice[j + 1]]) {
                 int temp = indice[j];
@@ -17,6 +22,7 @@ void argsort_bubble(T *vettore, int *indice, int n) {
             }
         }
     }
+    return sum;
 }
 
 inline void checkCudaError(cudaError_t result, const char *msg, const char *file, int line) {
@@ -194,6 +200,17 @@ void load_model_from_file(
     }
 
     in.close();
+}
+
+
+void append_score_to_file(const std::string& filename, float tot_score) {
+    std::ofstream out(filename, std::ios::app);  // apre in append
+    if (!out.is_open()) {
+        throw std::runtime_error("Impossibile aprire il file per scrivere.");
+    }
+
+    out << tot_score << "\n";  // una riga per ogni valore
+    out.close();
 }
 
 
