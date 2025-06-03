@@ -437,12 +437,12 @@ void simulazione(
                 }
 
                 // Aspetto che tutti i kernel del batch finiscano prima di riutilizzare i workspace
-                /*
+                
                 for(int workspace_idx = 0; workspace_idx < max; workspace_idx++) {
                     int stream_id = workspace_idx % n_stream;
                     cudaStreamSynchronize(streams[stream_id]);
                 }
-                */
+                
 
             }
             
@@ -481,7 +481,7 @@ void simulazione(
                 launch_mappa_signal(world_value_d, world_id_d, world_signal_d, world_rgb_d, world_dim, n_creature, 0);
                 CUDA_CHECK(cudaGetLastError());
 
-                cudaMemcpy(world_rgb_h, world_rgb_d, tot_world_dim_size_float * 3, cudaMemcpyDeviceToHost);
+                cuda_memcpy(world_rgb_h, world_rgb_d, tot_world_dim_size_float * 3, cudaMemcpyDeviceToHost, cc_major, 0);
                 CUDA_CHECK(cudaGetLastError());
 
                 // Carica i dati nella texture OpenGL

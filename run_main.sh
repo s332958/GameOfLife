@@ -1,7 +1,6 @@
 #!/bin/bash
 
 ./main.exe \
-  -render \
   -ep 50 \
   -st 200 \
   -scale 3 \
@@ -25,3 +24,5 @@
   -mutation_range 0.5 \
   -clean_window_size 15 \
   -model_structure 100,50,25,10
+
+    # -render \
