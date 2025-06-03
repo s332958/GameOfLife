@@ -1,13 +1,13 @@
 #!/bin/bash
 
 ./main.exe \
-  -ep 50 \
+  -ep 100 \
   -st 200 \
   -scale 3 \
-  -world_dim 512 \
+  -world_dim 200 \
   -n_creature 20 \
-  -max_workspace 10 \
-  -eval_method 1 \
+  -max_workspace 1 \
+  -eval_method 0 \
   -reserve_memory 50 \
   -checkpoint_epoch 5 \
   -pn_scale_obstacles 15.5 \
@@ -23,7 +23,8 @@
   -mutation_probability 0.03 \
   -mutation_range 0.5 \
   -clean_window_size 15 \
-  -model_structure 50,25,10 \
-  -render \
+  -model_structure 18,2,10 \
   -load
+
+  # -render
 

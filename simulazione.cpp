@@ -438,11 +438,12 @@ void simulazione(
                 }
 
                 // Aspetto che tutti i kernel del batch finiscano prima di riutilizzare i workspace
-                
+                /*
                 for(int workspace_idx = 0; workspace_idx < max; workspace_idx++) {
                     int stream_id = workspace_idx % n_stream;
                     cudaStreamSynchronize(streams[stream_id]);
                 }
+                */
                 
 
             }
