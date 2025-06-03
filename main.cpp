@@ -24,7 +24,7 @@ void parse_args(int argc, char** argv, Simulation_setup& setup) {
         if (arg == "-render") {
             setup.render = true;
         } else if (arg == "-ep" && i + 1 < argc) {
-            setup.N_EPHOCS = std::stoi(argv[++i]);
+            setup.N_EPOCH = std::stoi(argv[++i]);
         } else if (arg == "-st" && i + 1 < argc) {
             setup.N_STEPS = std::stoi(argv[++i]);
         } else if (arg == "-scale" && i + 1 < argc) {
@@ -75,6 +75,8 @@ void parse_args(int argc, char** argv, Simulation_setup& setup) {
             setup.mutation_range = std::stof(argv[++i]);
         } else if (arg == "-clean_window_size" && i + 1 < argc) {
             setup.clean_window_size = std::stoi(argv[++i]);
+        } else if (arg == "-watch_signaling") {
+            setup.watch_signaling = true;
         } else if (arg == "-model_structure" && i + 1 < argc) {
             std::string list = argv[++i];
             setup.model_structure.clear();
@@ -111,13 +113,13 @@ int main(int argc, char* argv[]) {
     //fuori dal ciclo
     if(simulation_setup.render){
         if (!glfwInit()) {
-            std::cerr << "Errore nell'inizializzazione di GLFW" << std::endl;
+            std::cerr << "Error initialization of GLFW" << std::endl;
             return -1;
         }
         window = glfwCreateWindow(simulation_setup.world_dim*simulation_setup.scale, simulation_setup.world_dim*simulation_setup.scale, "OpenGL Image Rendering", NULL, NULL);
     
         if (!window) {
-            std::cerr << "Errore nella creazione della finestra" << std::endl;
+            std::cerr << "Error in creating window" << std::endl;
             glfwTerminate();
             return -1;
         }
@@ -150,6 +152,7 @@ int main(int argc, char* argv[]) {
         load_constant_memory_GPU(simulation_setup.n_creature);
     }
 
+    // if load is present, start loading creature from model/structure_of_the_model
     if (simulation_setup.load){
         int n_weight = 0;
         int n_bias = 0;
@@ -178,11 +181,13 @@ int main(int argc, char* argv[]) {
     
     }else{        
 
-        std::ofstream out("log_score.txt", std::ios::trunc);  // apre e svuota il file
+        // generation of score_file
+        std::ofstream out("log_score.txt", std::ios::trunc); 
         out.close();
 
     }
 
+    // reduce max_workspace to world_dimension
     if(simulation_setup.world_dim*simulation_setup.world_dim<simulation_setup.MAX_WORKSPACE){
         simulation_setup.MAX_WORKSPACE = simulation_setup.world_dim*simulation_setup.world_dim;
     }

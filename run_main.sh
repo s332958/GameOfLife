@@ -1,12 +1,12 @@
 #!/bin/bash
 
 ./main.exe \
-  -ep 100 \
+  -ep 200 \
   -st 200 \
   -scale 3 \
-  -world_dim 200 \
-  -n_creature 20 \
-  -max_workspace 1 \
+  -world_dim 300 \
+  -n_creature 30 \
+  -max_workspace 10 \
   -eval_method 0 \
   -reserve_memory 50 \
   -checkpoint_epoch 5 \
@@ -23,8 +23,34 @@
   -mutation_probability 0.03 \
   -mutation_range 0.5 \
   -clean_window_size 15 \
-  -model_structure 18,2,10 \
-  -load
+  -model_structure 162,100,10 \
+  -load \
+  -render
 
-  # -render
+  # -ep INT \
+  # -st INT \
+  # -scale INT \
+  # -world_dim INT \
+  # -n_creature INT \
+  # -max_workspace INT \
+  # -eval_method INT \
+  # -reserve_memory INT \
+  # -checkpoint_epoch INT \
+  # -pn_scale_obstacles FLOAT \
+  # -pn_threshold_obstacles FLOAT \
+  # -pn_scale_food FLOAT \
+  # -pn_threshold_food FLOAT \
+  # -random_threshold_food FLOAT \
+  # -starting_value FLOAT \
+  # -energy_fraction FLOAT \
+  # -energy_decay FLOAT \
+  # -winners_fraction FLOAT \
+  # -recombination_fraction FLOAT \
+  # -mutation_probability FLOAT \
+  # -mutation_range FLOAT \
+  # -clean_window_size INT \
+  # -model_structure INT,INT.. \
+  # -load \
+  # -render \
+  # -watch_signaling
 

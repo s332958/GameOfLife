@@ -15,7 +15,7 @@ struct Simulation_setup {
     size_t reserve_free_memory;
     float* weights_models;
     float* biases_models;
-    int N_EPHOCS;
+    int N_EPOCH;
     int N_STEPS;
     int MAX_WORKSPACE;
     int METHOD_EVAL;
@@ -38,6 +38,7 @@ struct Simulation_setup {
     float mutation_range;
     int clean_window_size;
     char file_model[200];
+    bool watch_signaling;
 
     Simulation_setup(
         int world_dim = 400,
@@ -47,7 +48,7 @@ struct Simulation_setup {
         size_t reserve_free_memory = 30 * 1024 * 1024,
         float* weights_models = nullptr,
         float* biases_models = nullptr,
-        int N_EPHOCS = 10,
+        int N_EPOCH = 10,
         int N_STEPS = 100,
         int METHOD_EVAL = 0,
         bool render = false,
@@ -67,7 +68,8 @@ struct Simulation_setup {
         float mutation_range = 0.4f,
         int clean_window_size = 11,
         bool load = false,
-        int scale = 1
+        int scale = 1,
+        bool watch_signaling = false
     )
         : world_dim(world_dim),
           n_creature(n_creature),
@@ -76,7 +78,7 @@ struct Simulation_setup {
           reserve_free_memory(reserve_free_memory),
           weights_models(weights_models),
           biases_models(biases_models),
-          N_EPHOCS(N_EPHOCS),
+          N_EPOCH(N_EPOCH),
           N_STEPS(N_STEPS),
           MAX_WORKSPACE(world_dim * world_dim),
           METHOD_EVAL(METHOD_EVAL),
@@ -98,7 +100,8 @@ struct Simulation_setup {
           clean_window_size(clean_window_size),
           load(load),
           scale(scale),
-          file_model("")
+          file_model(""),
+          watch_signaling(watch_signaling)
     {
         int offset = 0;
         for(int i=0; i<n_layer; i++){
