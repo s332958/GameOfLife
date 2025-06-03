@@ -5,6 +5,7 @@
 #include "libs/utils_kernel.cuh"
 #include "libs/utils_cpu.h"
 #include "libs/perlin_noise.cuh"
+#include "simulazione.h"
 
 #include <GLFW/glfw3.h>
 
@@ -16,49 +17,56 @@
 #include <unistd.h> 
 #include <time.h>
 #include <iomanip>
-
-
+#include <string>
 
 void simulazione(
-    int world_dim, int n_creature, 
-    int *model_structure, int n_layer, size_t reserve_free_memory, 
-    float *weights_models, float *biases_models, 
-    int const N_EPHOCS, int const N_STEPS, int const MAX_WORKSPACE, int const METHOD_EVAL, 
-    bool render,        // checkpoint_epoc 
+    Simulation_setup simulation_setup,
     GLFWwindow* window, GLuint textureID
 ) {
 
 
     //  -----------------------------------------
-    //
+    //  Define Simulation Parameters
     //  -----------------------------------------
-    int checkpoint_epoch = 1;
+
+    int world_dim = simulation_setup.world_dim;
+    int n_creature = simulation_setup.n_creature;
+    int const n_layer = simulation_setup.n_layer;
+    int model_structure[n_layer] = {0}; 
+    std::copy(simulation_setup.model_structure.begin(), simulation_setup.model_structure.end(), model_structure);
+    printf("STRUTTURA MODELLO: \n");
+    for(int i=0; i<n_layer; i++) printf("%d ",model_structure[i]);
+    printf("\n");
+    size_t reserve_free_memory = simulation_setup.reserve_free_memory;
+    float *weights_models = simulation_setup.weights_models;
+    float *biases_models = simulation_setup.biases_models;
+    int N_EPHOCS = simulation_setup.N_EPHOCS;
+    int N_STEPS = simulation_setup.N_STEPS;
+    int MAX_WORKSPACE = simulation_setup.MAX_WORKSPACE;
+    int METHOD_EVAL = simulation_setup.METHOD_EVAL;
+    bool render = simulation_setup.render;
+
+    int checkpoint_epoch = simulation_setup.checkpoint_epoch;
     
-    float PN_scale_obstacles = 10.0f;
-    float PN_threshold_obstacles = 0.85f;
+    float PN_scale_obstacles = simulation_setup.PN_scale_obstacles;
+    float PN_threshold_obstacles = simulation_setup.PN_threshold_obstacles;
 
-    float PN_scale_food = 8.0f;
-    float PN_threshold_food = 0.90f;
-    float random_threshold_food = 0.99f;
+    float PN_scale_food = simulation_setup.PN_scale_food;
+    float PN_threshold_food = simulation_setup.PN_threshold_food;
+    float random_threshold_food = simulation_setup.random_threshold_food;
     
-    float starting_value = 9.0f;
-    float energy_fraction = (1.0f / 9.0f) / 2.0f;
-    float energy_decay = 0.001f;
+    float starting_value = simulation_setup.starting_value;
+    float energy_fraction = simulation_setup.energy_fraction;
+    float energy_decay = simulation_setup.energy_decay;
 
-    float winners_fraction = 0.45f;
-    float recombination_newborns_fraction = 0.75f;
+    float winners_fraction = simulation_setup.winners_fraction;
+    float recombination_newborns_fraction = simulation_setup.recombination_newborns_fraction;
     
-    float gen_x_block = 0.005f;
-    float mutation_probability = 0.02f;
-    float mutation_range = 0.4f;
+    float gen_x_block = simulation_setup.gen_x_block;
+    float mutation_probability = simulation_setup.mutation_probability;
+    float mutation_range = simulation_setup.mutation_range;
 
-    int clean_window_size = 11;
-
-    // parametrizzare food e obstacles, mutazioni randomiche, soglia di ricombinazione
-
-    // sistemare tutti i reset con memsetasync
-    // mettere array di supporto all'inizio e si passa come argomento 
-
+    int clean_window_size = simulation_setup.clean_window_size;
 
     clock_t start;
     clock_t end;
@@ -355,7 +363,8 @@ void simulazione(
 
             cudaMemset(world_contributions_d, 0, tot_matrix_contribution_size);
             CUDA_CHECK(cudaGetLastError());
-            cudaMemset(workspace_input_d, 0, workspace_size*dim_max_layer);
+            //printf("CUDAMEMSET: %ld  dim_max_layer: %d\n",workspace_size*dim_max_layer,dim_max_layer);
+            cudaMemset(workspace_input_d, 0, workspace_size*n_workspace);
             CUDA_CHECK(cudaGetLastError());
 
             /*
@@ -526,7 +535,9 @@ void simulazione(
             }
             */
             end = clock();  // End time
-            std::cout << "Step: " << epoca << "." << step << " " << *n_cell_alive_h << "  |" << std::fixed << std::setprecision(1) << 1.0f/((float)(end - start) / CLOCKS_PER_SEC) << " it/s" << "\n";
+            char epocstep[64];
+            snprintf(epocstep, sizeof(epocstep), "%d.%d", epoca,step);
+            printf("Step: %10s \t alive_cell: %8d  |  %3.1f it/s \n",epocstep,*n_cell_alive_h,1.0f/((float)(end - start) / CLOCKS_PER_SEC));
         }
 
         // -------------------------------------------

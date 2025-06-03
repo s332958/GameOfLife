@@ -82,6 +82,9 @@
         "xtr1common": "cpp",
         "future": "cpp",
         "list": "cpp",
-        "xhash": "cpp"
+        "xhash": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "cinttypes": "cpp"
     }
 }

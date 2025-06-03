@@ -14,82 +14,101 @@
 #include <vector>
 #include <format>
 
-//cudaMallocAsync e cudaFreeAsync disponibili solo su GPU con Compute Capability >= 7.0
-const int n_layer = 4;
-int model_structure [n_layer] = {18, 10, 10, 10};
-float * weights_models = nullptr; 
-float * biases_models = nullptr; 
-
-bool load = false;
-
-size_t reserve_free_memory = 1024 * 1024 * 300; // * 1024;// 1GB
-
-const int MAX_CREATURE = 64;
-
 GLFWwindow* window;
 GLuint textureID;
 
+void parse_args(int argc, char** argv, Simulation_setup& setup) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+
+        if (arg == "-render") {
+            setup.render = true;
+        } else if (arg == "-ep" && i + 1 < argc) {
+            setup.N_EPHOCS = std::stoi(argv[++i]);
+        } else if (arg == "-st" && i + 1 < argc) {
+            setup.N_STEPS = std::stoi(argv[++i]);
+        } else if (arg == "-scale" && i + 1 < argc) {
+            setup.scale = std::stoi(argv[++i]);
+        } else if (arg == "-world_dim" && i + 1 < argc) {
+            setup.world_dim = std::stoi(argv[++i]);
+            setup.MAX_WORKSPACE = setup.world_dim * setup.world_dim;
+        } else if (arg == "-n_creature" && i + 1 < argc) {
+            setup.n_creature = std::stoi(argv[++i]);
+        } else if (arg == "-max_workspace" && i + 1 < argc) {
+            setup.MAX_WORKSPACE = std::stoi(argv[++i]);
+        } else if (arg == "-eval_method" && i + 1 < argc) {
+            int method = std::stoi(argv[++i]);
+            if (method == 0 || method == 1) {
+                setup.METHOD_EVAL = method;
+            }else{
+                setup.METHOD_EVAL = 0;
+            }
+        } else if (arg == "-reserve_memory" && i + 1 < argc) {
+            setup.reserve_free_memory = static_cast<size_t>(std::stoi(argv[++i])) * 1024 * 1024;
+        } else if (arg == "-load") {
+            setup.load = true;
+        } else if (arg == "-checkpoint_epoch" && i + 1 < argc) {
+            setup.checkpoint_epoch = std::stoi(argv[++i]);
+        } else if (arg == "-pn_scale_obstacles" && i + 1 < argc) {
+            setup.PN_scale_obstacles = std::stof(argv[++i]);
+        } else if (arg == "-pn_threshold_obstacles" && i + 1 < argc) {
+            setup.PN_threshold_obstacles = std::stof(argv[++i]);
+        } else if (arg == "-pn_scale_food" && i + 1 < argc) {
+            setup.PN_scale_food = std::stof(argv[++i]);
+        } else if (arg == "-pn_threshold_food" && i + 1 < argc) {
+            setup.PN_threshold_food = std::stof(argv[++i]);
+        } else if (arg == "-random_threshold_food" && i + 1 < argc) {
+            setup.random_threshold_food = std::stof(argv[++i]);
+        } else if (arg == "-starting_value" && i + 1 < argc) {
+            setup.starting_value = std::stof(argv[++i]);
+        } else if (arg == "-energy_fraction" && i + 1 < argc) {
+            setup.energy_fraction = std::stof(argv[++i]);
+        } else if (arg == "-energy_decay" && i + 1 < argc) {
+            setup.energy_decay = std::stof(argv[++i]);
+        } else if (arg == "-winners_fraction" && i + 1 < argc) {
+            setup.winners_fraction = std::stof(argv[++i]);
+        } else if (arg == "-recombination_fraction" && i + 1 < argc) {
+            setup.recombination_newborns_fraction = std::stof(argv[++i]);
+        } else if (arg == "-mutation_probability" && i + 1 < argc) {
+            setup.mutation_probability = std::stof(argv[++i]);
+        } else if (arg == "-mutation_range" && i + 1 < argc) {
+            setup.mutation_range = std::stof(argv[++i]);
+        } else if (arg == "-clean_window_size" && i + 1 < argc) {
+            setup.clean_window_size = std::stoi(argv[++i]);
+        } else if (arg == "-model_structure" && i + 1 < argc) {
+            std::string list = argv[++i];
+            setup.model_structure.clear();
+            std::stringstream ss(list);
+            std::string num;
+            while (std::getline(ss, num, ',')) {
+                try {
+                    setup.model_structure.push_back(std::stoi(num));
+                } catch (...) {
+                    std::cerr << "Invalid model_structure value: " << num << std::endl;
+                }
+            }
+            setup.n_layer = static_cast<int>(setup.model_structure.size());
+        }
+    }
+}
+
 int main(int argc, char* argv[]) {
 
+    clock_t start = clock();  // Start time 
     // dipendenza temporale ai valori randomici in CPU
     srand(time(0));
 
-    clock_t start = clock();  // Start time 
-    bool render = false;
-    int numero_epoch = 4;
-    int numero_step = 100;
-    int scale = 1;
-    int world_dim = 200;
-    int n_creature = 30;
-    int MAX_WORKSPACE = 10000;
-    int METHOD_EVAL = 1;
+    Simulation_setup simulation_setup = Simulation_setup();
     
-    // Controlla se c'è almeno un argomento
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "-render") {
-            render = true;
-        }
-        if(arg == "-ep"){
-            numero_epoch = std::atoi(argv[i+1]);
-        }
-        if(arg == "-st"){
-            numero_step = std::atoi(argv[i+1]);
-        }
-        if(arg == "-scale"){
-            scale = std::atoi(argv[i+1]);
-        }
-        if(arg == "-world_dim"){
-            world_dim = std::atoi(argv[i+1]);
-        }
-        if(arg == "-n_creature"){
-            n_creature = std::atoi(argv[i+1]);
-            if(n_creature>MAX_CREATURE) n_creature = MAX_CREATURE;
-        }
-        if(arg == "-max_workspace"){
-            MAX_WORKSPACE = std::atoi(argv[i+1]);
-        }
-        if(arg == "-eval_method"){
-            METHOD_EVAL = std::atoi(argv[i+1]);
-            if(METHOD_EVAL!= 0 || METHOD_EVAL != 1) METHOD_EVAL = 0;
-        }
-        if(arg == "-reserve_memory"){
-            // reserve Mb of free memory for don't sature the GPU
-            reserve_free_memory = std::atoi(argv[i+1]) * 1024 * 1024;
-        }
-        if(arg == "-load"){
-            // reserve Mb of free memory for don't sature the GPU
-            load = std::atoi(argv[i+1]) != 0;
-        }
-    }
+    parse_args(argc, argv, simulation_setup);
     
     //fuori dal ciclo
-    if(render){
+    if(simulation_setup.render){
         if (!glfwInit()) {
             std::cerr << "Errore nell'inizializzazione di GLFW" << std::endl;
             return -1;
         }
-        window = glfwCreateWindow(world_dim*scale, world_dim*scale, "OpenGL Image Rendering", NULL, NULL);
+        window = glfwCreateWindow(simulation_setup.world_dim*simulation_setup.scale, simulation_setup.world_dim*simulation_setup.scale, "OpenGL Image Rendering", NULL, NULL);
     
         if (!window) {
             std::cerr << "Errore nella creazione della finestra" << std::endl;
@@ -119,27 +138,27 @@ int main(int argc, char* argv[]) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, world_dim, world_dim, 0, GL_RGB, GL_FLOAT, nullptr);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, simulation_setup.world_dim, simulation_setup.world_dim, 0, GL_RGB, GL_FLOAT, nullptr);
 
         //creazione colori
-        load_constant_memory_GPU(n_creature);
+        load_constant_memory_GPU(simulation_setup.n_creature);
     }
 
-    if (load){
+    if (simulation_setup.load){
         int n_weight = 0;
         int n_bias = 0;
     
-        for(int i = 0; i < n_layer - 1; ++i) {
-            n_weight += model_structure[i] * model_structure[i + 1];
-            n_bias += model_structure[i + 1];
+        for(int i = 0; i < simulation_setup.n_layer - 1; ++i) {
+            n_weight += simulation_setup.model_structure[i] * simulation_setup.model_structure[i+1];
+            n_bias += simulation_setup.model_structure[i + 1];
         }
-        size_t tot_models_weight_size = n_creature * n_weight * sizeof(float);
-        size_t tot_models_bias_size = n_creature * n_bias * sizeof(float);
+        size_t tot_models_weight_size = simulation_setup.n_creature * n_weight * sizeof(float);
+        size_t tot_models_bias_size = simulation_setup.n_creature * n_bias * sizeof(float);
     
-        weights_models = (float*) malloc(tot_models_weight_size);
-        biases_models = (float*) malloc(tot_models_bias_size);
+        simulation_setup.weights_models = (float*) malloc(tot_models_weight_size);
+        simulation_setup.biases_models = (float*) malloc(tot_models_bias_size);
     
-        load_model_from_file("models/file1.txt", weights_models, biases_models, n_weight, n_bias, n_creature);
+        load_model_from_file("models/file1.txt", simulation_setup.weights_models, simulation_setup.biases_models, n_weight, n_bias, simulation_setup.n_creature);
     }else{        
 
         std::ofstream out("log_score.txt", std::ios::trunc);  // apre e svuota il file
@@ -147,17 +166,16 @@ int main(int argc, char* argv[]) {
 
     }
 
-
+    if(simulation_setup.world_dim*simulation_setup.world_dim<simulation_setup.MAX_WORKSPACE){
+        simulation_setup.MAX_WORKSPACE = simulation_setup.world_dim*simulation_setup.world_dim;
+    }
 
     simulazione(
-        world_dim, n_creature, 
-        model_structure, n_layer, reserve_free_memory, 
-        weights_models, biases_models, 
-        numero_epoch, numero_step, MAX_WORKSPACE, METHOD_EVAL, render,
+        simulation_setup,
         window, textureID
     );
 
-    if(render){
+    if(simulation_setup.render){
         glDeleteTextures(1, &textureID);
         glfwDestroyWindow(window);
         glfwTerminate();
