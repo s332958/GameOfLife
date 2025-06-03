@@ -106,7 +106,7 @@ __global__ void mappa_signal_kernel(float * mondo_value, int* id_matrix, float* 
 
 void launch_mappa_colori(float* mondo, int* id_matrix, float* mondo_rgb_d, int world_dim, cudaStream_t stream){
 
-    int n_thread_per_block = 1024; //properties.maxThreadsPerBlock; 
+    int n_thread_per_block = 1024; 
     int thread_number = world_dim*world_dim*3;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
@@ -117,7 +117,7 @@ void launch_mappa_colori(float* mondo, int* id_matrix, float* mondo_rgb_d, int w
 
 void launch_mappa_signal(float* mondo, int* id_matrix, float* mondo_signal, float* mondo_rgb_d, int world_dim, int n_creature, cudaStream_t stream){
 
-    int n_thread_per_block = 1024; //properties.maxThreadsPerBlock; 
+    int n_thread_per_block = 1024; 
     int thread_number = world_dim*world_dim*3;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 

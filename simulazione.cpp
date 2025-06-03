@@ -34,9 +34,7 @@ void simulazione(
     int const n_layer = simulation_setup.n_layer;
     int model_structure[n_layer] = {0}; 
     std::copy(simulation_setup.model_structure.begin(), simulation_setup.model_structure.end(), model_structure);
-    printf("STRUTTURA MODELLO: \n");
-    for(int i=0; i<n_layer; i++) printf("%d ",model_structure[i]);
-    printf("\n");
+
     size_t reserve_free_memory = simulation_setup.reserve_free_memory;
     float *weights_models = simulation_setup.weights_models;
     float *biases_models = simulation_setup.biases_models;
@@ -67,6 +65,9 @@ void simulazione(
     float mutation_range = simulation_setup.mutation_range;
 
     int clean_window_size = simulation_setup.clean_window_size;
+
+    char path_save_file[300];
+    sprintf(path_save_file,"models/%s",simulation_setup.file_model);
 
     clock_t start;
     clock_t end;
@@ -229,7 +230,7 @@ void simulazione(
         cuda_memcpy(model_biases_h, model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToHost, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
         
-        save_model_on_file("models/file1.txt",model_structure,n_layer,model_weights_h,model_biases_h,n_weight,n_bias,n_creature);
+        save_model_on_file(path_save_file,model_structure,n_layer,model_weights_h,model_biases_h,n_weight,n_bias,n_creature);
 
         printf("FINE GENERAZIONE MODELLI \n");
     }
@@ -647,7 +648,7 @@ void simulazione(
             cuda_memcpy(model_biases_h, new_model_biases_d, tot_models_bias_size, cudaMemcpyDeviceToHost, cc_major, 0);
             CUDA_CHECK(cudaGetLastError());
 
-            save_model_on_file("models/file1.txt",model_structure,n_layer,model_weights_h,model_biases_h,n_weight,n_bias,n_creature);
+            save_model_on_file(path_save_file,model_structure,n_layer,model_weights_h,model_biases_h,n_weight,n_bias,n_creature);
             printf("MODEL GENERATE AND SAVE \n");
         }       
 

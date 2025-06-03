@@ -123,7 +123,7 @@ void save_model_on_file(
     }
 
     for (int modello = 0; modello < n_modelli; ++modello) {
-        // Riga 1: vettore dim
+        // Riga 1: vettore dim   
         for (int i = 0; i < dim_size; ++i) {
             out << dim[i];
             if (i < dim_size - 1) out << " ";
@@ -152,7 +152,7 @@ void save_model_on_file(
     out.close();
 }
 
-void load_model_from_file(
+int load_model_from_file(
     const std::string& nome_file,
     float* pesi_totale,
     float* bias_totale,
@@ -162,7 +162,8 @@ void load_model_from_file(
 {
     std::ifstream in(nome_file);
     if (!in.is_open()) {
-        throw std::runtime_error("Impossibile aprire il file per la lettura.");
+        printf("Impossibile aprire il file per la lettura");
+        return 0;
     }
 
     std::string line;
@@ -200,6 +201,7 @@ void load_model_from_file(
     }
 
     in.close();
+    return 1;
 }
 
 

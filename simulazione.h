@@ -5,9 +5,7 @@
 #include <GLFW/glfw3.h> // GLFWwindow
 #include <GL/gl.h>      // GLuint
 #include <vector>
-
-#include <vector>
-#include <cstddef> // size_t
+#include <stdio.h>
 
 struct Simulation_setup {
     int world_dim;
@@ -39,6 +37,7 @@ struct Simulation_setup {
     float mutation_probability;
     float mutation_range;
     int clean_window_size;
+    char file_model[200];
 
     Simulation_setup(
         int world_dim = 400,
@@ -98,8 +97,15 @@ struct Simulation_setup {
           mutation_range(mutation_range),
           clean_window_size(clean_window_size),
           load(load),
-          scale(scale)
-    {}
+          scale(scale),
+          file_model("")
+    {
+        int offset = 0;
+        for(int i=0; i<n_layer; i++){
+            if(i<n_layer-1) offset += sprintf(file_model + offset, "%d_", model_structure[i]);
+            else offset += sprintf(file_model + offset, "%d.txt", model_structure[i]);
+        }
+    }
 };
 
 void simulazione(

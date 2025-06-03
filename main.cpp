@@ -88,6 +88,12 @@ void parse_args(int argc, char** argv, Simulation_setup& setup) {
                 }
             }
             setup.n_layer = static_cast<int>(setup.model_structure.size());
+            int offset = 0;
+            for(int i=0; i<setup.n_layer; i++){
+                if(i<setup.n_layer-1) offset += sprintf(setup.file_model + offset, "%d_", setup.model_structure[i]);
+                else offset += sprintf(setup.file_model + offset, "%d.txt", setup.model_structure[i]);
+            }
+            printf("Model file: %s \n",setup.file_model);
         }
     }
 }
@@ -157,8 +163,19 @@ int main(int argc, char* argv[]) {
     
         simulation_setup.weights_models = (float*) malloc(tot_models_weight_size);
         simulation_setup.biases_models = (float*) malloc(tot_models_bias_size);
+        
+        char path_file[300];
+        sprintf(path_file,"models/%s",simulation_setup.file_model);
+        bool load_done = load_model_from_file(path_file, simulation_setup.weights_models, simulation_setup.biases_models, n_weight, n_bias, simulation_setup.n_creature);
+        
+        // if load of creature is not possible free the memory and set nullprt to weights and biases
+        if(load_done==false){
+            free(simulation_setup.weights_models);
+            free(simulation_setup.biases_models);
+            simulation_setup.weights_models = nullptr;
+            simulation_setup.biases_models = nullptr;
+        }
     
-        load_model_from_file("models/file1.txt", simulation_setup.weights_models, simulation_setup.biases_models, n_weight, n_bias, simulation_setup.n_creature);
     }else{        
 
         std::ofstream out("log_score.txt", std::ios::trunc);  // apre e svuota il file

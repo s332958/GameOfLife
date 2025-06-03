@@ -99,8 +99,6 @@ __global__ void world_update_kernel(
         if (ID == 0){
             if (enemy_energy > 0){
                 
-                
-
                 // calcolo il valore finale come somma pesata del valore iniziale per il contributo, piu la somma del massimo contribuente 
                 // assegno l'id al contribuente maggiore
                 final_value = starting_value * (max_value / enemy_energy) + max_value;
@@ -179,6 +177,7 @@ __global__ void clean_around_cells_kernel (float* world_value_d, int* world_id_d
 }    
 
  //============================================================================================
+ 
     //Wrapper add objects to world
 void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_world,
                                 int id, float min_value, float max_value, float threshold,
@@ -242,57 +241,7 @@ void launch_clean_around_cells(float* world_value_d, int* world_id_d, int dim_wo
     clean_around_cells_kernel<<<n_block,n_thread_per_block,0,stream>>>(world_value_d, world_id_d, dim_world, cellule, localNcellule, window_size);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ===============================================================================================================================================================
-// NUOVO TEST
-
 
 __global__ void find_index_cell_alive_kernel(
     int *world_id,
@@ -378,7 +327,6 @@ __global__ void compact_cell_alive_kernel_pt1(
         alive_cell_vector[global_idx] = shared_mem[blockDim.x + local_idx];
     }
 }
-
 
 
 __global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *support_vector, int *n_alive_cell, int n_block, int dim_block){

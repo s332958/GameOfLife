@@ -42,10 +42,10 @@ void computeFreeMemory(size_t* free_memory);
 void* cuda_allocate(size_t size, int cc_major, cudaStream_t stream = 0);
 void cuda_memcpy(void* dst, const void* src, size_t size, cudaMemcpyKind kind, int cc_major, cudaStream_t stream = 0);
 void cuda_Free(void* ptr, int cc_major, cudaStream_t stream);
-int next_stream(int* index_stream, int limit);
-int get_random_int(int min, int max);
+int  next_stream(int* index_stream, int limit);
+int  get_random_int(int min, int max);
 void save_model_on_file(const std::string& nome_file, const int* dim, int dim_size,
                         const float* pesi_totale, const float* bias_totale, int dim_pesi, int dim_bias, int n_modelli);
-void load_model_from_file(const std::string& nome_file, float* pesi_totale, float* bias_totale, int dim_pesi, int dim_bias, int n_modelli);
+int  load_model_from_file(const std::string& nome_file, float* pesi_totale, float* bias_totale, int dim_pesi, int dim_bias, int n_modelli);
 void append_score_to_file(const std::string& filename, float tot_score);
 void save_map(FILE* file, int dim_world, const float* world_value, const int* world_id);

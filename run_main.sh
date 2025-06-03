@@ -23,6 +23,7 @@
   -mutation_probability 0.03 \
   -mutation_range 0.5 \
   -clean_window_size 15 \
-  -model_structure 100,50,25,10
+  -model_structure 50,25,10 \
+  -render \
+  -load
 
-    # -render \
