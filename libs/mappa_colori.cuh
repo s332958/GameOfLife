@@ -3,13 +3,14 @@
 
 #include <cuda_runtime.h>
 
-// Funzione per inizializzare la memoria costante sulla GPU
+// Function for init GPU constant memory for the colors
 void load_constant_memory_GPU(int n_creature);
 
-// Funzione che lancia il kernel di color mapping
+// Function for launch world color mapping
 void launch_mappa_colori(float* mondo, int* id_matrix, float* mondo_rgb_d, int world_dim, cudaStream_t stream);
 
-
+// Function for launch world signal color mapping
 void launch_mappa_signal(float* mondo, int* id_matrix, float* mondo_signal, float* mondo_rgb_d, int world_dim, int n_creature, cudaStream_t stream);
 
+// GPU Zone for colors (in constant memory)
 extern __constant__ float COLORI[100][3];

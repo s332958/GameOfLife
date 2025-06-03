@@ -10,6 +10,7 @@
 
 // =========================================================================================================
 
+// kernel for adding object to world (like obstacles or food)
 __global__ void add_objects_to_world_kernel(float *world_value, int *world_id, int dim_world, 
                                     int id, float min_value, float max_value, float threashold
                                 ){
@@ -21,10 +22,12 @@ __global__ void add_objects_to_world_kernel(float *world_value, int *world_id, i
     if(idx<dim_world*dim_world){
 
         if(world_id[idx]==0){
+            // instantiate a random generator
             curandState state;
             curand_init(clock64(),threadIdx.x,0,&state);
             float p_occupation = curand_uniform(&state);
 
+            // if the random value is over a threashold, then generate a random value for the cell and store the chosen ID
             if(p_occupation>threashold){
                 float value = curand_uniform(&state)*(max_value - min_value) + (min_value);
                 world_id[idx] = id;
@@ -39,6 +42,8 @@ __global__ void add_objects_to_world_kernel(float *world_value, int *world_id, i
 
 // =========================================================================================================
 
+// kernel that from a contribution matrix (that rappresent the contribution of each creature for each cell)
+// compute the final creature fo each cell
 __global__ void world_update_kernel(
     float *world_value, 
     int *id_matrix, 
@@ -53,98 +58,98 @@ __global__ void world_update_kernel(
     {                 
         int index = blockIdx.x * blockDim.x + threadIdx.x;
         
-        // se i thread superano la dim del mondo ritorno
+      // if thread are greater that world_Dim return
         if(index >= dim_world*dim_world) return;
         
-        // trovo ID e valore cella data la matrice degli id e indice cella mondo
+        // get ID and value from id_matrix and world_value
         int ID = id_matrix[index];
         float starting_value = world_value[index];
         
-        // se l'ID è -1 ovvero un ostacolo ritorno
+        // if the cell is occupated from an obstacles set -1 value and return
+        // FORSE SI PUO TOGLIERE IL -1
         if(ID == -1) {
             world_value[index] = -1;
             return;
         }
         
-        // setto i valori finale e id finale i valori iniziali della cella
+        // set the final cell value and id with the value of past step
         float final_value = starting_value;
         int final_id = ID;
         
-        // eseguo un for con dimensione pari al numero massimo di creature per trovare la creatura che ha contribuito di piu 
+        // use a for cicle to find the model that give more contribution
         int max_id = 0;
         float max_value = 0;
         float ally_energy = 0;
         float enemy_energy = 0;
         
         for(int i = 0; i < number_of_creatures; i++){
-            // prendo il valore di contributo dato ID e indice cella mondo
+            // get the contribution value given id (i) and offset cell
             float value = contribution_matrix[i * dim_world * dim_world + index]; 
             if (ID == i+1){
-                // se l'id del contributo è uguale all'id della cella allora aumenta l'energia alleata
+                // if contribution is from  a creature with the same ID cell, so raise the allay energy
                 ally_energy += value;      
             }    
             else{
-                // se l'id del contributo è diverso dall'id della cella corrente allora aumenta l'energia nemica
+                // if contribution is from a creature with different ID cell, raise enemy energy
                 enemy_energy += value;
             }
-            // mi salvo il massimo cotribuente e il suo valore                      
+            // save the most creature that give more energy and the energy that it gives                  
             if (value > max_value){
                 max_value = value;
                 max_id = i+1;
             }    
         } 
 
-        // eseguo i conti se la cella iniziale era libera id=0 
-        //printf("Thread %d ID %d says %f, %f!\n", index, ID, ally_energy, enemy_energy);       
+        // if the cell is empty
         if (ID == 0){
             if (enemy_energy > 0){
                 
-                // calcolo il valore finale come somma pesata del valore iniziale per il contributo, piu la somma del massimo contribuente 
-                // assegno l'id al contribuente maggiore
+                // the final value is compute by the formula below
+                // assing the id at the creature with most contribution
                 final_value = starting_value * (max_value / enemy_energy) + max_value;
                 final_id = max_id;
-                
-                // aggiorno il numero di celle vive e salvo l'indice
-                //int pos = atomicAdd(cellCount, 1);
-                //cells[pos] = index;
-                //printf("UPDATE CELL ALIVE: %d con index %d \n",pos-1,index);
+
             }else{
                 world_signal[index] = 0;
             }    
         } 
         
-        // eseguo i conti se la cella iniziale era occupata id>0
+        // if the cell is occupied
         else{
             
             if (starting_value + ally_energy - enemy_energy < 0){
-                // se la cella è occupata e la forza delle celle nemiche supera quella corrente + alleate allora la cella muore e l'eccesso viene lasciato come cibo
+                // if the enemy cell is greater than staring value plus ally energy, set the final energy as the difference between the two value and final id equal 0 
                 final_value = abs(starting_value + ally_energy - enemy_energy);
                 final_id = 0;
             }            
             else{
-                // se la cella è occupata ma la forza nemica è inferiore ad alleati + corrente si calcola solo la somma tra alleata corrente e - nemici e questo è il nuovo risultato
+                //if starting value plus ally cell is grater than enemy energy, set final vlaue as difference between the two value
                 final_value = starting_value + ally_energy - enemy_energy;
             }
+
+            // after the computation apply the energy decay
             final_value = final_value - energy_decay;    
         }    
         
-        // se il valore finale ha una soglia troppo bassa allora l'energia va al mondo
+        // if the final energy is less then 0.02 the id return to 0
         if(final_value < 0.02f){
            final_id = 0;
         }     
         
-        // se il valore finale ha una soglia troppo alta allora l'energia viene impostata al max 1
+        // if the final value exceed the max (1.0) cap the value to max
         if(final_value > 1.0f){
             final_value = 1.0f;
         }    
 
-        // assegno i valori finali alla cella in analisi
+        // assing to the cell teh final value
         world_value[index] = final_value;                   
         id_matrix[index] = final_id; 
 
 }    
     
     //================================================================================
+
+    // kernel that clean the obstacles and food around the creature
 __global__ void clean_around_cells_kernel (float* world_value_d, int* world_id_d, int dim_world, int* cellule, int ncellule, int window_size){
 
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -193,7 +198,7 @@ void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_
 
 }
 
-//Wrapper mondo_cu update
+//Wrapper world update
 void launch_world_update(
     float *world_value,
     int *id_matrix,
@@ -223,13 +228,11 @@ void launch_world_update(
         cells,
         energy_decay
     );
-    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori world_update_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
-    
 
 }
 
 
-
+// wrapper that launch clear space around cells
 void launch_clean_around_cells(float* world_value_d, int* world_id_d, int dim_world, int* cellule, int* ncellule, int window_size, cudaStream_t stream){
 
     int n_thread_per_block = 1024; 
@@ -243,6 +246,8 @@ void launch_clean_around_cells(float* world_value_d, int* world_id_d, int dim_wo
 
 // ===============================================================================================================================================================
 
+// kernel that read the world and then save the index of the cell alive in cell alive vector
+// after that start a reduction to compute the number of cells
 __global__ void find_index_cell_alive_kernel(
     int *world_id,
     int *cell_alive_vector,
@@ -261,11 +266,11 @@ __global__ void find_index_cell_alive_kernel(
         cell_alive_vector[idx] = is_alive * (idx+1);
     }
 
-    // Scriviamo il valore nella shared memory (0 se fuori dai limiti)
+    // write the value in the shared memory (0 if exceed the limits, that is for don't doing illigal memory access)
     shared_mem[tid] = (idx < world_dim_tot) ? is_alive : 0;
     __syncthreads();
 
-    // Riduzione generale per blocchi NON potenze di due
+    // Start the reduction
     for (int s = blockDim.x / 2; s > 0; s >>= 1) {
         if (tid < s+1 && tid+s+1 <blockDim.x) {
             shared_mem[tid] += shared_mem[tid + s+1];
@@ -274,6 +279,7 @@ __global__ void find_index_cell_alive_kernel(
         __syncthreads();
     }
 
+    // save the value of each reduction (one per block) in n_cell_alive
     if (tid == 0) {
         shared_mem[0] += shared_mem[1];
         shared_mem[1] = 0;
@@ -281,6 +287,7 @@ __global__ void find_index_cell_alive_kernel(
     }
 }
 
+// kernel that give the first part of compatting the array alive cell
 __global__ void compact_cell_alive_kernel_pt1(
     int *alive_cell_vector,
     int *support_vector,
@@ -296,7 +303,7 @@ __global__ void compact_cell_alive_kernel_pt1(
     shared_mem[local_idx] = 0;
     shared_mem[blockDim.x + local_idx] = 0;
 
-    // Carica in shared
+    // load in shared
     if (global_idx < world_dim) {
         shared_mem[local_idx] = alive_cell_vector[global_idx];
         alive_cell_vector[global_idx] = 0;
@@ -304,7 +311,7 @@ __global__ void compact_cell_alive_kernel_pt1(
 
     __syncthreads();
 
-    // Filtro: fatto da thread 0
+    // thread 0 count the number of alive cell in his block and save it contigous cell in shared memory
     if (local_idx == 0) {
         int count = 0;
         for (int i = 0; i < blockDim.x; i++) {
@@ -315,20 +322,23 @@ __global__ void compact_cell_alive_kernel_pt1(
             }
         }
 
+        // save in the support vector the number of alive cell in his block
         shared_mem[2 * blockDim.x] = count;
         support_vector[blockIdx.x] = count;
     }
 
     __syncthreads();
 
-    // Scrittura valori filtrati nel buffer alive (solo entro limiti)
+    // Rewrite the compact value in global memory 
     int count = shared_mem[2 * blockDim.x];
     if (local_idx < count) {
         alive_cell_vector[global_idx] = shared_mem[blockDim.x + local_idx];
     }
+
 }
 
-
+// kernel that start the second part of compatting the alive cell vector
+// this kernel MUST be launch with 1 block
 __global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *support_vector, int *n_alive_cell, int n_block, int dim_block){
 
     __shared__ int shared_mem[2];       
@@ -336,6 +346,9 @@ __global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *suppo
 
     int idx = threadIdx.x + blockDim.x*blockIdx.x;
 
+    // the first cell in shared memory 0 rappresent the offset of the alive cell vector (where to start to write values) 
+    // the second cell in shared memory is the number of alive cell in block
+    // after read the value in the support vector, than update the value of the corrisponding block in the support vector
     if(n_block==0 && threadIdx.x==0){
         shared_mem[0] = 0;
         shared_mem[1] = support_vector[n_block];
@@ -348,10 +361,10 @@ __global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *suppo
 
     __syncthreads();
 
+    // using threads for writing the alive cell value in adiacent cells, starting form the offset loaded before
     int idx_alive_cell_read = n_block*dim_block+idx;
     if(idx<shared_mem[1]){
         int offset = shared_mem[0];
-        //printf("read cell: %d \n",idx_alive_cell_read);
         int idx_alive_cell_write = offset+idx;
         alive_cell_vector[idx_alive_cell_write] = alive_cell_vector[idx_alive_cell_read]-1;
     }
@@ -384,8 +397,6 @@ void launch_find_index_cell_alive(
         n_cell_alive_d
     );
 
-   //cudaDeviceSynchronize();
-
     n_thread = 512;
     n_block = (world_dim_tot+n_thread-1) / n_thread;
 
@@ -399,6 +410,8 @@ void launch_find_index_cell_alive(
     int block_dim_pt1 = n_thread;
     int n_block_pt1 = n_block;
 
+    // this part is sequential, it is suppose to start to reorder the cell alive vector staring from index 0 to the n_alive_cell index
+    // launch the kernel with only one block
     for(int i=0; i<n_block_pt1; i++){
         compact_cell_alive_kernel_pt2<<<1,n_thread,0,stream>>>(
             alive_cell_vector,

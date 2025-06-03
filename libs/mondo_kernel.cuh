@@ -20,6 +20,7 @@ void launch_world_update(float* world_value,
                          float energy_decay,
                          cudaStream_t stream);
 
+// function for compute the new array cell alive, that found index of alive cell and then compact them in a vector without space                         
 void launch_find_index_cell_alive(
     int *world_id,
     int world_dim_tot,
@@ -30,6 +31,7 @@ void launch_find_index_cell_alive(
     cudaStream_t stream
 );
 
+// function for clean che surrounding of the creature (this is for balance the start of each creature)
 void launch_clean_around_cells(
     float* world_value_d, 
     int* world_id_d, 

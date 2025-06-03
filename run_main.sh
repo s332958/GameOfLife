@@ -1,8 +1,8 @@
 #!/bin/bash
 
 ./main.exe \
-  -ep 200 \
-  -st 200 \
+  -ep 2000 \
+  -st 2000 \
   -scale 3 \
   -world_dim 300 \
   -n_creature 30 \
@@ -24,8 +24,7 @@
   -mutation_range 0.5 \
   -clean_window_size 15 \
   -model_structure 162,100,10 \
-  -load \
-  -render
+  -load 
 
   # -ep INT \
   # -st INT \

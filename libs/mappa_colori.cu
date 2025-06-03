@@ -5,11 +5,11 @@
 #include <iostream>
 #include <cmath>
 
-// Dichiaro la memoria costante in GPU dove verranno tenuti i colori per poi fare il rendering
+// Declare constant memory for save color matrix using for map the color during the rendering
 __constant__ float COLORI[100][3];
 
 
-// Dichiaro i colori in host
+// declere color in host 
 void generateDistinctColors(float* colors, int n_creature) {
     for (int i = 0; i < n_creature; ++i) {
         // HSV -> RGB conversion per generare colori distinti
@@ -37,7 +37,7 @@ void generateDistinctColors(float* colors, int n_creature) {
 }
 
 
-// Passo i colori in GPU e poi libero l'allocazione in Host
+// Save color in GPU after generating them in GPU
 void load_constant_memory_GPU(int n_creature) {
     float *color_h = (float*) malloc(sizeof(int)*n_creature*3);
     generateDistinctColors(color_h, n_creature);
@@ -47,7 +47,8 @@ void load_constant_memory_GPU(int n_creature) {
     free(color_h);
 }
 
-// Kernel per generare i colori corrispettivi dati mondo_value, monod_id, e l'output mondo_rgb
+
+// Kernel for generating colors from world_value and world_id
 __global__ void mappa_colori_kernel(float* mondo, int* id_matrix, float* mondo_rgb, int thread_number) {
     
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -63,10 +64,10 @@ __global__ void mappa_colori_kernel(float* mondo, int* id_matrix, float* mondo_r
     int out_index = pixel_index * 3 + channel;
 
     if (ID == -1) {
-        mondo_rgb[out_index] = (channel == 0) ? 1.0f : 0.0f;  // rosso per ostacoli
+        mondo_rgb[out_index] = (channel == 0) ? 1.0f : 0.0f;  // red for obstacles
     }
     else if (ID == 0) {
-        mondo_rgb[out_index] = value;  // scala di grigi
+        mondo_rgb[out_index] = value;  // gray scale for neutral cell
     }
     else{
         mondo_rgb[out_index] = COLORI[ID - 1][channel] * (value + 0.01) * 5;
@@ -86,16 +87,14 @@ __global__ void mappa_signal_kernel(float * mondo_value, int* id_matrix, float* 
     int ID = id_matrix[pixel_index];
     float value = mondo_signal[pixel_index];
     float signal = value;
-    //(value - (1/n_creature)*(ID-1))*n_creature;
-
 
     int out_index = pixel_index * 3 + channel;
 
     if (ID == -1) {
-        mondo_rgb[out_index] = (channel == 0) ? 1.0f : 0.0f;  // rosso per ostacoli
+        mondo_rgb[out_index] = (channel == 0) ? 1.0f : 0.0f;  // red for obstacles
     }
     else if (ID == 0) {
-        mondo_rgb[out_index] = mondo_value[pixel_index];  // scala di grigi
+        mondo_rgb[out_index] = mondo_value[pixel_index];  // gray scale for neutral cell
     }
     else{
         mondo_rgb[out_index] = COLORI[ID - 1][channel] * (signal + 0.02) * 3;
