@@ -105,8 +105,8 @@ __global__ void world_update_kernel(
                 final_id = max_id;
                 
                 // aggiorno il numero di celle vive e salvo l'indice
-                int pos = atomicAdd(cellCount, 1);
-                cells[pos] = index;
+                //int pos = atomicAdd(cellCount, 1);
+                //cells[pos] = index;
                 //printf("UPDATE CELL ALIVE: %d con index %d \n",pos-1,index);
             }else{
                 world_signal[index] = 0;

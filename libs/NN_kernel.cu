@@ -86,7 +86,7 @@ __global__ void NN_forward_kernel(
         int ID = world_id[world_index];
         //printf("thread: %d ID: %d index: %d \n",tidx, ID, world_index);
 
-        if (ID <= 0)return;
+        //if (ID <= 0)return;
 
         // ottengo l'accesso ai pesi del modello corretto 
         int weight_index = n_weights * (ID - 1) + tidx + offset_weights; // + offset pesi siccome dipendono dal layer (es layer0 offeset=0, layer1 offset=layer0*layer1)
