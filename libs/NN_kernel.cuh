@@ -12,6 +12,8 @@ void launch_vision(
     int* cell_idx,
     int raggio,
     float* input_workspace_addr,
+    int dim_max_layer,
+    int n_workspace,
     cudaStream_t stream
 );
 
@@ -42,7 +44,8 @@ void launch_output_elaboration(
     int world_dim,
     int number_of_creatures,
     int output_size,
-    int cell_index,
+    int dim_max_layer,
+    int n_workspace,
     float energy_fraction,
     cudaStream_t stream
 );
