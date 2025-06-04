@@ -464,7 +464,7 @@ void simulazione(
             end = clock(); 
             char epocstep[64];
             snprintf(epocstep, sizeof(epocstep), "%d.%d", epoca,step);
-            printf("Step: %10s \t alive_cell: %8d  |  %3.1f it/s \n",epocstep,*n_cell_alive_h,1.0f/((float)(end - start) / CLOCKS_PER_SEC));
+            printf("Step: %10s \t alive_cell: %8d  |  %2.4f ms \n",epocstep,*n_cell_alive_h,(float)(end - start) / CLOCKS_PER_SEC *1000);
         }
 
         // -------------------------------------------

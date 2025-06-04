@@ -16,6 +16,7 @@ __device__ float fast_sigmoid(float x) {
 
 // ============================================================================
 
+// function that compute of surrounding of the alive cell, this is the input of the NN
 __global__ void vision_kernel(
     float* world_value,
     int* world_id,
@@ -26,8 +27,8 @@ __global__ void vision_kernel(
     float* workspace_addr
 ) 
 {
-    int x = threadIdx.x + blockIdx.x * blockDim.x; // colonna nella finestra raggio x raggio
-    int y = threadIdx.y + blockIdx.y * blockDim.y; // riga nella finestra raggio x raggio
+    int x = threadIdx.x + blockIdx.x * blockDim.x; 
+    int y = threadIdx.y + blockIdx.y * blockDim.y; 
 
     if (x >= raggio || y >= raggio) return;
 
@@ -37,12 +38,11 @@ __global__ void vision_kernel(
     int center_row = cell_index / dim_world;
     int center_col = cell_index % dim_world;
 
-    // Calcola coordinate "virtuali" senza wrapping
+    // coumpute world sourrounding cells
     int world_row = (center_row - (raggio / 2) + y + dim_world) % dim_world;
     int world_col = (center_col - (raggio / 2) + x + dim_world) % dim_world;
 
     int offset = (y*raggio + x)*2;
-    //printf("thread: %d \n",offset);
 
     int world_pos = world_row * dim_world + world_col;
     int ID_vision = world_id[world_pos];
@@ -57,7 +57,8 @@ __global__ void vision_kernel(
 
 // ============================================================================
 
-
+// function that compute the elaboration to one layer of NN to another
+// ONE BLOCK LIMITATION
 __global__ void NN_forward_kernel(
     float* input_addr,
     float* output_addr, 
@@ -73,70 +74,61 @@ __global__ void NN_forward_kernel(
     int offset_weights,
     int offset_biases
 ){
-        // index del thread 
+        //thread index
         int tidx = blockIdx.x * blockDim.x + threadIdx.x;
 
-        // se il thread supera la dim dei weights  allora ritorno 
+        // if thread exceed dim weights return
         if (tidx >= layer2_size * layer1_size){
             return;
         }
 
-        // ottengo l'indice di dove si trova la cella viva cosi poi accedo al suo ID per capire che modello usare
+        //obtain the ID of cell from world id, to select the model for computing output
         int world_index = cells[cell_index];
         int ID = world_id[world_index];
-        //printf("thread: %d ID: %d index: %d \n",tidx, ID, world_index);
 
         //if (ID <= 0)return;
 
-        // ottengo l'accesso ai pesi del modello corretto 
-        int weight_index = n_weights * (ID - 1) + tidx + offset_weights; // + offset pesi siccome dipendono dal layer (es layer0 offeset=0, layer1 offset=layer0*layer1)
+        // get index of the weights of the model
+        int weight_index = n_weights * (ID - 1) + tidx + offset_weights; // + offset weights of the layer (es layer0 offeset=0, layer1 offset=layer0*layer1)
         
-        // assegno ad ogni thread la cella da cui leggere l'input e dove assegnare il suo output
+        //assing at each thread the cell where read the input and write the output
         int output_index = tidx % layer2_size;
         int input_index = tidx / layer2_size;
         
-        // ottengo per ogni thread il suo input*weight
+        // compute for each thread the weighted value
         float weighted = weights[weight_index] * input_addr[input_index];
 
-        // pulisco le celle di memoria che mi servono in output
+        // clean the output cell 
         if (tidx < layer2_size){
             output_addr[tidx] = 0;
         }
-        /*
-        
-        printf("thread in azione: %4d, ID: %4d, weight: %4d, output_idx: %4d, input_idx: %4d\n",tidx, ID, weight_index, output_index, input_index);
-        printf("thread: %4d, input: %4.4f, weight: %4.4f, input_weight: %4.4f output: %d\n",tidx,input_addr[input_index],weights[weight_index],weighted,output_index);
-        */
 
         __syncthreads();
 
-        // sommo per ogni cella di output i propri pesi
+        // add for eanch output cell the weighted value
         atomicAdd(&output_addr[output_index], weighted);
         
-        // blocco tutti i thread che hanno id maggiore della dimensione dei bias del layer di output
+        // block all the thread that have dimension higher than number of biases 
         if (tidx >= layer2_size){
             return;
         }
         
-        // otttengo i bias realitivi in base al modello corretto
-        int bias_index = n_biases * (ID - 1) + tidx + offset_biases;  // + offset pesi siccome dipendono dal layer (es layer1 offeset=0, layer2 offset=layer1)
+        // obtain the the biases index of the model
+        int bias_index = n_biases * (ID - 1) + tidx + offset_biases;  // + offset becouse biases depend on layer (es layer1 offeset=0, layer2 offset=layer1)
 
         __syncthreads();
 
-        //printf("thread in azione: %4d, ID: %4d, bias_index: %4d\n",tidx, ID, bias_index);
-
-        // sommo il bias alla cella di output corretta
+        // sum the bias to corret output cell
         output_addr[tidx] += biases[bias_index];
-        // printf("thread: %4d, bias: %.4f totale_dopo: %4.4f \n",tidx,biases[bias_index],output_addr[tidx]);
-
-        // applico la relu ad ogni cella di output modificata 
+    
+        // apply relu function to the output cell
         output_addr[tidx] = relu(output_addr[tidx]);
 
 }
 
 //===================================================================================
 
-
+// this function compute the output obtain from the model layer
 __global__ void output_elaboration_kernel(
     float* world_value,
     float* world_signal,
@@ -150,63 +142,61 @@ __global__ void output_elaboration_kernel(
     int cell_index,
     float frazione_di_se_stesso
 ){  
-    //indice del thread
+    // index thread
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
-    //se eccedo il numero di output blocco il thread
+    // return if index thread is greater than output size
     if(index >= output_size) return;
 
-    //prendo il valore calcolato nell'output
+    // get value from the output cell
     float output = outputs[index];
 
-    //applico sigmoid
+    // apply sigmoid
     output = sigmoid(output);
 
-    //trovo l'indice della cella del mondo per trovare il suo ID, nel mentre trovo i punti dove scrivere l'output
+    //get information about alive cell (ID and value) and its position
     int center_index = cells[cell_index];
     int output_index = index;
     int ID = world_id[center_index];
 
-    //l'ultimo thread va a modificare il mondo di signaling 
+    // last thread update world siganling
     if(output_index == output_size-1){
-        //float signal = (1/number_of_creatures)*(ID-1)+(output/number_of_creatures);
         world_signal[center_index] = output;
         return;
     }
 
-    // prendo tramite indice cella, il valore corrispettivo nel mondo
+    // get the value of the cell
     float center_value = world_value[center_index];
 
-    // calcolo la x e la y dell'indice della cella del mondo
+    // compute x ad y of the world (of the cell alive)
     int center_x = center_index % world_dim;
     int center_y = center_index / world_dim;
 
-    //trovo il raggio di intorno delle celle che vengono modificate della contribution matrix
+    // get the ray surrounding where write the output
     int dim_out_window = sqrtf(output_size-1);
     int raggio = dim_out_window/2;
 
-    // trovo le corrispettive x e y di ogni cella modificata (considerando il mondo toroidale)
+    // get x y of cell surrounding considering the world toroidal
     int filter_x = ((output_index % dim_out_window) - raggio + center_x + world_dim)%world_dim;
     int filter_y = ((output_index / dim_out_window) - raggio + center_y + world_dim)%world_dim;
     
-    // trovo l'indice nel mondo della cella modificata
+    // find index in contribution matrix for indicate the contribution of the creature in each cell
     int filter_index = (world_dim * world_dim * (ID - 1)) + (filter_y * world_dim) + filter_x;
 
 
-    // calcolo il valore finale da mettere nella cella dei contributi
+    // compute final result in the cell of contribution
     float final_output = center_value * frazione_di_se_stesso * output;
 
-    //printf("thread: %d max: %d idx: %d  ID: %d\n",index,world_dim*world_dim*number_of_creatures,filter_index,ID);
-
-    // modifico celle dei contributi circostanti in base al final_output calcolato prima
+    // apply contribution to the contribution matrix
     atomicAdd(&contribution_matrix[filter_index], final_output);
 
-    // modifico il valore della cella che ha generato lo spostamento
+    // modifiy the value of the cell that generate the movment
     atomicAdd(&world_value[center_index], - final_output);    
 }
 
 // ===================================================================================
 
+// function to compute the energy and occupation of each creature
 __global__ void compute_energy_and_occupation_kernel(
     float* world_value,
     int* world_id,
@@ -230,8 +220,9 @@ __global__ void compute_energy_and_occupation_kernel(
 
 // ==================================================================================
 
-// PREMESSA:
-// la struttura dei blocchi è importante, il numero di thread dentro ad un blocco, indica il numero di pesi/biases che ogni blocco genetico possiede
+// Function that recombine the creature parameters
+// NOTE:
+// the block dim is important, the number of thread of eache block represent the number of genes in each genetic block
 __global__ void recombine_models_kernel(
     float *weights, float *biases,
     float *new_weights, float *new_biases,
@@ -243,17 +234,17 @@ __global__ void recombine_models_kernel(
 {
     __shared__ int gen_id;
 
-    // Calcolo indice thread
+    //caompute thread and max number of genes in the model
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int total_genes = num_weights_per_model + num_bias_per_model;
-    // faccio una return dei thread che superano la somma di pesi+biases
+    // return if the thread are greater of the sum
     if (idx >= total_genes) return;
 
-    // creazione d curandstate per generare valori casuali su device
+    // creation of curand state for random value
     curandState state;
     curand_init(seed, idx, 0, &state);
 
-    // il primo thread di ogni blocco si occupa di generare il numero del genitore del blocco genetico
+    // the first thread define the parent of the genetic block
     if(threadIdx.x==0){
         int gen = curand(&state) % 2;
         gen_id = gen==0?model1_idx:model2_idx;
@@ -263,45 +254,41 @@ __global__ void recombine_models_kernel(
 
     int idx_model_param_gen = -1;
 
-    // caso in cui stiamo analizzando i pesi (indice < numero pesi modello)
+    // phase of weights computation (idx < num of weights)
     if (idx < num_weights_per_model) {
 
-        // calcolo l'indice dei geni (pesi singoli) dal blocco genetico del genitore
+        // get index of gene form the parents parametes
         idx_model_param_gen = (gen_id * num_weights_per_model) + idx;
 
-        // carico il valore del gene 
+        // load gene value
         float gene_value = weights[idx_model_param_gen];
 
-        // genero un numero casuale per definire se il gene subisce una mutazione (caso per cui viene superata la soglia di mutazione)
-        if (curand_uniform(&state) < mutation_prob) {
-            // calcolo il delta della variazione che va da -mutation_range a mutation_range
+        // define a random value, if value is less than mutation probability, so the gene variate his value
+        if (curand_uniform(&state) > mutation_prob) {
+            //compute mutation value, is in range from -mutation_range to mutation_range
             float delta = (curand_uniform(&state) * 2.0f - 1.0f) * mutation_range;
-            // applico il delta
+            // apply mutation value
             gene_value += delta;
         }
 
-        // trovo l'indice per scrivere il nuovo valore sul nuovo modello e lo aggiorno
+        // find the index of the new gene and then update
         int idx_model_param_out = (output_idx * num_weights_per_model + idx);
         new_weights[idx_model_param_out] = gene_value;
 
     }else{
 
-        //caso in cui siamo nei bias (indice > numero peso modelli) 
-        //calcolo indice gene genitore come per i pesi ma si toglie l'offset del numero di pesi (questo perche i thread dei biases sono tutti dopo i pesi)
+        //case biases (idx > weights model) 
+        //compute index of bias gene considerig the offset of weights (biases threads are after the list of weights threads)
         idx_model_param_gen = (gen_id * num_bias_per_model) + idx - num_weights_per_model;
 
-        // carico il valore del gene in un registro
+        // this part is the same seen before, but with biases
         float gene_value = biases[idx_model_param_gen];
 
-        // genero un valore casuale che se supera la soglia allora indica la mutazione del gene
         if (curand_uniform(&state) < mutation_prob) {
-            // calcolo il valore di mutzione del gene come fatto in precedenza 
             float delta = (curand_uniform(&state) * 2.0f - 1.0f) * mutation_range;
-            // aggiorno il valore del nuovo gene
             gene_value += delta;
         }
 
-        // trovo l'indice su dove va scritto il bias appena calcolato e lo aggiorno
         int idx_model_param_out = (output_idx * num_bias_per_model) + idx - num_weights_per_model;
         new_biases[idx_model_param_out] = gene_value;
 
@@ -312,14 +299,14 @@ __global__ void recombine_models_kernel(
 //=================================================================================
 
 // Wrapper kernel visione
-void launch_vision(                 // Testata e funzionante 
-    float* world_value,                         // mondo che contiene i valori
-    int* world_id,                              // mondo che contiene gli id
-    float* world_signaling,                     // mondo che contiene i signaling
-    int dim_world,                              // dimensione del mondo 
-    int* cell_idx,                              // cella di memoria della cellula viva
-    int raggio,                                 // raggio di visione della cellula 
-    float* input_workspace_addr,                // indirizzo della stazione di input su cui scrivere il risultato (dim area di memoria = raggio*raggio*3)
+void launch_vision(                
+    float* world_value,                         
+    int* world_id,                              
+    float* world_signaling,                     
+    int dim_world,                              
+    int* cell_idx,                             
+    int raggio,                                 
+    float* input_workspace_addr,                
     cudaStream_t stream
 ){
 
@@ -345,29 +332,26 @@ void launch_vision(                 // Testata e funzionante
 // ===================================================================================================
 
 // Wrapper kernel NN_forward
-// Limitazione i layer successivi devono avere dim dimnore del layer iniziale
-// Usare una sola cella di memoria
-void launch_NN_forward(                                     // Testata e funzionante
-    float* input_workspace_addr,                    //inizio memoria zona di input
-    float* output_workspace_addr,                   //inizio memoria zona di output
-    float* weights,                                 //pesi di tutti i modelli
-    int n_weights,                                  //pesi x modello
-    float* biases,                                  //biases tutti i modelli
-    int n_biases,                                   //biases x modello
-    int* structure,                                 //vettore con le dimensioni dei layer di modelli (tutti i modelli hanno le stesse dim)
-    int cell_index,                                 //indice della cellula viva che si usa per calcolare l'input
-    int *cells,                                     //array delle cellule vive
-    int *world_id,                                  //mondo che contiene gli id delle celle
-    int dim_structure,                              //numero di layer del modello (tutti i modelli hanno lo stesso numero di layer)
+// compute the output of each layer sequntialy
+void launch_NN_forward(                                     
+    float* input_workspace_addr,                    
+    float* output_workspace_addr,                   
+    float* weights,                                 
+    int n_weights,                                  
+    float* biases,                                  
+    int n_biases,                                   
+    int* structure,                                 
+    int cell_index,                                 
+    int *cells,                                     
+    int *world_id,                                  
+    int dim_structure,                              
     cudaStream_t stream    
 ){
     int n_thread_per_block = 1024;
     int layer1_size = 0;
     int layer2_size = 0;
     int structureLenght = dim_structure;
-    // printf("STRUCTURE LENGHT: %d",structureLenght);
-    // int layerInput_size = structure[0];
-    // int layerOutput_size = structure[structureLenght];
+
     int weight_offset = 0;
     int biases_offset = 0;
 
@@ -420,7 +404,7 @@ void launch_NN_forward(                                     // Testata e funzion
             
         }
 
-        // aggiornamento offset
+        // update offset
         weight_offset += layer1_size*layer2_size;
         biases_offset += layer2_size;
 
@@ -431,17 +415,17 @@ void launch_NN_forward(                                     // Testata e funzion
 // ===================================================================================================
 
 //Wrapper kernel output_elaboration
-void launch_output_elaboration(                                 // Funziona e testata
-    float* world_value,                             // matrice mondo valori
-    float* world_signal,                            // matrice che contiene i signaling
-    int* world_id,                                  // matrice mondo che contiene gli id per cella
-    float* contribution_matrix,                     // matrice dei contributi di ogni creatura
-    float* output_workspace_addr,                   // area di memoria dell'output del workspace
-    int* cells,                                     // array cellule vive
-    int world_dim,                                  // dimensione del mondo
-    int number_of_creatures,                        // numero di creature massime nel mondo
-    int output_size,                                // dimensione dell'output
-    int cell_index,                                 // indice cella viva in analisi
+void launch_output_elaboration(                                 
+    float* world_value,                            
+    float* world_signal,                            
+    int* world_id,                                  
+    float* contribution_matrix,                     
+    float* output_workspace_addr,                  
+    int* cells,                                     
+    int world_dim,                                  
+    int number_of_creatures,                        
+    int output_size,                               
+    int cell_index,                                 
     float energy_fraction,
     cudaStream_t stream
 ){
@@ -462,7 +446,6 @@ void launch_output_elaboration(                                 // Funziona e te
         cell_index,
         energy_fraction
     );
-    if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori output_elaboration_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
     
 
 }
@@ -510,15 +493,13 @@ void launch_recombine_models_kernel(
     unsigned long seed,
     cudaStream_t stream) 
 {
-    // Numero totale di geni (pesi + bias)
+    // totla number of genes (weights + biases)
     int total_genes = num_weights_per_model + num_bias_per_model;
 
-    // Imposta configurazione kernel
     int threads_per_block = gen_x_block*total_genes +1;
     if(threads_per_block>1024) threads_per_block = 1024;
     int num_blocks = (total_genes + threads_per_block - 1) / threads_per_block;
 
-    // Lancia il kernel
     recombine_models_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
         d_weights,
         d_biases,

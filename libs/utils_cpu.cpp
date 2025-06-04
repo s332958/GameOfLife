@@ -30,7 +30,7 @@ inline void checkCudaError(cudaError_t result, const char *msg, const char *file
         std::string error_message = std::string("[CUDA ERROR] ") + msg + 
             " at " + file + ":" + std::to_string(line) + 
             "\n  → " + cudaGetErrorString(result);
-        //throw std::runtime_error(error_message);
+        throw std::runtime_error(error_message);
         std::cout<<error_message<<"\n";
     }
 }
@@ -38,13 +38,13 @@ inline void checkCudaError(cudaError_t result, const char *msg, const char *file
 #define CUDA_CHECK(val) checkCudaError((val), #val, __FILE__, __LINE__)
 
 
-// Funzione per ottenere memoria libera disponibile sulla GPU
+// dunction for obtain the free GPU memory value
 void computeFreeMemory(size_t *free_memory) {
     size_t t;
     cudaMemGetInfo(free_memory, &t);
 }
 
-// Funzione per allocare memoria sulla GPU, sincrona o asincrona in base alla compute capability
+// Function for allocate syncronous or asyncronous memory, in base at cc
 void* cuda_allocate(size_t size, int cc_major, cudaStream_t stream = 0) {
     void* ptr = nullptr;
     cudaError_t err;
@@ -63,7 +63,7 @@ void* cuda_allocate(size_t size, int cc_major, cudaStream_t stream = 0) {
     return ptr;
 }
 
-// Funzione per spostare i dati 
+// Function for copy syncronous or asyncronous memory, in base at cc
 void cuda_memcpy(void* dst, const void* src, size_t size, cudaMemcpyKind kind, int cc_major, cudaStream_t stream = 0) {
     cudaError_t err;
 
@@ -82,7 +82,7 @@ void cuda_memcpy(void* dst, const void* src, size_t size, cudaMemcpyKind kind, i
 }
 
 
-// Funzione per deallocare memoria sulla GPU, sincrona o asincrona in base alla compute capability
+// Function for deallocate syncronous or asyncronous memory, in base at cc
 void cuda_Free(void* ptr, int cc_major, cudaStream_t stream) {
     if (cc_major >= 7) {
         cudaFreeAsync(ptr, stream);
@@ -91,22 +91,22 @@ void cuda_Free(void* ptr, int cc_major, cudaStream_t stream) {
     }
 }
 
-// Funzione per mantenere l'ordine degli stream
+// Function for compute next stream value
 int next_stream(int *index_stream, int limit){
     *index_stream = ((*index_stream)+1) % limit;
     return *index_stream;
 }
 
-// Funzione per generare numero random tra min e max
+// Function for generate a random value between a min and max
 int get_random_int(int min, int max) {
-    static std::random_device rd;                      // sorgente di entropia
-    static std::mt19937 gen(rd());                     // generatore Mersenne Twister
-    std::uniform_int_distribution<> dis(min, max); // intervallo [0, limit-1]
+    static std::random_device rd;                      
+    static std::mt19937 gen(rd());                    
+    std::uniform_int_distribution<> dis(min, max); 
 
     return dis(gen);
 }
 
-// Funzione per salvare i modelli su file
+// Function to save models on file
 void save_model_on_file(
     const std::string& nome_file,
     const int* dim,
@@ -119,7 +119,7 @@ void save_model_on_file(
 {
     std::ofstream out(nome_file);
     if (!out.is_open()) {
-        throw std::runtime_error("Impossibile aprire il file per la scrittura.");
+        throw std::runtime_error("Impossible open the file for writing.");
     }
 
     for (int modello = 0; modello < n_modelli; ++modello) {
@@ -152,6 +152,7 @@ void save_model_on_file(
     out.close();
 }
 
+// function for loading models from file
 int load_model_from_file(
     const std::string& nome_file,
     float* pesi_totale,
@@ -162,7 +163,7 @@ int load_model_from_file(
 {
     std::ifstream in(nome_file);
     if (!in.is_open()) {
-        printf("Impossibile aprire il file per la lettura");
+        printf("Impossible open the file for reading");
         return 0;
     }
 
@@ -174,7 +175,6 @@ int load_model_from_file(
     while (std::getline(in, line) && modello < n_modelli) {
         // Riga 1: struttura modello (ignorata)
         // Salta senza fare nulla
-        // std::cout << "Struct: " << line << std::endl;
 
         // Riga 2: pesi
         std::getline(in, line);
@@ -204,20 +204,20 @@ int load_model_from_file(
     return 1;
 }
 
-
+// file for saving global score 
 void append_score_to_file(const std::string& filename, float tot_score) {
-    std::ofstream out(filename, std::ios::app);  // apre in append
+    std::ofstream out(filename, std::ios::app);  
     if (!out.is_open()) {
-        throw std::runtime_error("Impossibile aprire il file per scrivere.");
+        throw std::runtime_error("Impossible to open the file.");
     }
 
-    out << tot_score << "\n";  // una riga per ogni valore
+    out << tot_score << "\n";  
     out.close();
 }
 
 
 
-// Funzione per salvare mappa su file
+// function for saving map value (FOR DEBUG)
 void save_map(
     FILE *file,
     const int dim_world,

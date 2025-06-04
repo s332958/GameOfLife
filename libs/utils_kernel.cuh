@@ -3,7 +3,7 @@
 
 #include <cuda_runtime.h>
 
-// Riempie un vettore di float con valori casuali in un intervallo [minVal, maxVal]
+// Add random value in a vector, with value between [minVal, maxVal]
 void launch_fill_random_kernel(float* d_vec, int start, int finish, float minVal, float maxVal,
                                unsigned long seed, cudaStream_t stream);
 

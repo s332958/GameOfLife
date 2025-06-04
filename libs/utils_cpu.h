@@ -36,8 +36,7 @@ float argsort_bubble(T *vettore, int *indice, int n) {
     return sum;
 }
 
-
-// ========== DICHIARAZIONI altre funzioni ==========
+// ======== OTHER FUNCTION =======================
 void computeFreeMemory(size_t* free_memory);
 void* cuda_allocate(size_t size, int cc_major, cudaStream_t stream = 0);
 void cuda_memcpy(void* dst, const void* src, size_t size, cudaMemcpyKind kind, int cc_major, cudaStream_t stream = 0);

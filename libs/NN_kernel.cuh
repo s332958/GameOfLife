@@ -3,6 +3,7 @@
 
 #include <cuda_runtime.h>
 
+// function to compute the inut of NN
 void launch_vision(
     float* world_value,
     int* world_id,
@@ -14,6 +15,7 @@ void launch_vision(
     cudaStream_t stream
 );
 
+// function that compute the value between the layer of NN
 void launch_NN_forward(
     float* input_workspace_addr,
     float* output_workspace_addr,
@@ -29,6 +31,7 @@ void launch_NN_forward(
     cudaStream_t stream
 );
 
+// function that elaborate the output of NN
 void launch_output_elaboration(
     float* world_value,
     float* world_signal,
@@ -44,6 +47,7 @@ void launch_output_elaboration(
     cudaStream_t stream
 );
 
+// function that compute the energy and occupation of the creature
 void launch_compute_energy_and_occupation(
     float* world_value,
     int* world_id,
@@ -54,6 +58,7 @@ void launch_compute_energy_and_occupation(
     cudaStream_t stream
 );
 
+// function for recombine the models
 void launch_recombine_models_kernel(
     float *d_weights, float *d_biases,
     float *d_new_weights, float *d_new_biases,

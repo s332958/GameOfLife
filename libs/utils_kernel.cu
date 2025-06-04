@@ -8,6 +8,7 @@
 
 // ============================================================================
 
+// funtion for generating random number in a vector in GPU
 __global__ void fill_random_kernel(float* d_vec, int start, int finish, float minVal, float maxVal, unsigned long seed) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= finish - start) return;
