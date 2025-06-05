@@ -139,13 +139,7 @@ void simulazione(
     if(biases_models==nullptr)  model_biases_h = (float*) malloc(tot_models_bias_size);
     else model_biases_h        = biases_models;
 
-    // stream CUDA
-    int n_stream = MAX_WORKSPACE;
-    int a_stream = -1;
-    cudaStream_t streams[n_stream];
-    if (cc_major >= 5) {
-        for(int i=0;i<n_stream;i++) CUDA_CHECK(cudaStreamCreate(&streams[i]));
-    }
+
 
     // Allocazioni GPU 
     float *world_rgb_d                = (float*) cuda_allocate(tot_world_dim_size_float * 3, cc_major, 0);
@@ -177,11 +171,11 @@ void simulazione(
     int dim_max_layer = model_structure[i_max];
     int dim_input = model_structure[0];
     int dim_output = model_structure[n_layer - 1];
-    size_t workspace_size = dim_max_layer  * sizeof(float);
+    size_t workspace_size = dim_max_layer * sizeof(float);
 
     // compute n_workspace using all free memory avaible
     computeFreeMemory(&free_mem);
-    int n_workspace = (free_mem > reserve_free_memory) ? (free_mem - reserve_free_memory) / workspace_size : 0;
+    int n_workspace = (free_mem > reserve_free_memory) ? (free_mem - reserve_free_memory) / (workspace_size * 2) : 0;
 
     // if are not allocate workspace return error
     if (n_workspace == 0) {
@@ -189,7 +183,7 @@ void simulazione(
     } else if (n_workspace > world_dim * world_dim) {
         n_workspace = world_dim * world_dim;
     }
-    if(n_workspace>MAX_WORKSPACE) n_workspace=MAX_WORKSPACE;
+    //if(n_workspace>MAX_WORKSPACE) n_workspace=MAX_WORKSPACE;
 
     std::cout << "Free memory: " << free_mem << " bytes\n";
     std::cout << "Reserved memory: " << reserve_free_memory << " bytes\n";
@@ -198,8 +192,8 @@ void simulazione(
 
     // allocazione workspace
     float *workspace_input_d  = (float*) cuda_allocate(n_workspace * workspace_size, cc_major, 0);
-    // float *workspace_output_d = (float*) cuda_allocate(n_workspace * dim_workspace, cc_major, 0);
-
+    float *workspace_output_d  = (float*) cuda_allocate(n_workspace * workspace_size, cc_major, 0);
+  
     computeFreeMemory(&free_mem);
     std::cout << "Free memory after allocation " << free_mem/1024 << " KB\n";
 
@@ -258,7 +252,6 @@ void simulazione(
         printf("RESET ALL MATRIX \n"); 
 
         // ======================================== Aggiunta creature al mondo 
-        *n_cell_alive_h = 0;
 
         int random_index = rand() % world_dim*world_dim;
         for (int i = 0; i < n_creature; i++){
@@ -268,11 +261,12 @@ void simulazione(
             if(world_id_h[random_index] == 0){
                 world_value_h[random_index] = starting_value;
                 world_id_h[random_index] = i + 1;
-                alive_cells_h[i] = random_index;
-                *n_cell_alive_h += 1;
+                alive_cells_h[i] = random_index;                
                 random_index = rand() % (world_dim*world_dim);
             }     
         }
+
+        *n_cell_alive_h = n_creature;
 
         printf("SETUP CELL ALIVE \n");
 
@@ -323,20 +317,24 @@ void simulazione(
 
             cudaMemset(world_contributions_d, 0, tot_matrix_contribution_size);
             CUDA_CHECK(cudaGetLastError());
-            cudaMemset(workspace_input_d, 0, workspace_size*n_workspace);
+            cudaMemset(workspace_input_d, 0, n_workspace * workspace_size);
             CUDA_CHECK(cudaGetLastError());
+            cudaMemset(workspace_output_d, 0, n_workspace * workspace_size);
+            CUDA_CHECK(cudaGetLastError());
+            
 
             int offset_alive_cell = 0;
             int offset_workspace = 0;
-            int limit_workspace = n_workspace;
-            while(offset_alive_cell<*n_cell_alive_h){
-
-                int max = n_workspace<*n_cell_alive_h?n_workspace:*n_cell_alive_h;
-                int offset_workspace_in = 0;
-                int stream_id = 0;
+            int limit_workspace_cell = n_workspace;
+            if(n_workspace > *n_cell_alive_h){
+                limit_workspace_cell = *n_cell_alive_h;
+            }
+            while(offset_workspace<*n_cell_alive_h){               
+                
                 if(*n_cell_alive_h - offset_workspace < n_workspace){
-                    limit_workspace = *n_cell_alive_h - offset_workspace;
+                    limit_workspace_cell = *n_cell_alive_h - offset_workspace;
                 }
+
 
                 launch_vision(  
                     world_value_d,
@@ -346,57 +344,50 @@ void simulazione(
                     alive_cells_d+offset_workspace,
                     vision,
                     workspace_input_d,
-                    dim_max_layer,
-                    limit_workspace,
+                    limit_workspace_cell,
                     0
                 );
                 CUDA_CHECK(cudaGetLastError());
-                for(int workspace_idx=0; workspace_idx<max && offset_alive_cell<*n_cell_alive_h; workspace_idx++){
-
-                    offset_workspace_in = dim_max_layer*workspace_idx;
-                    stream_id = workspace_idx % n_stream;
 
 
 
-                    launch_NN_forward(
-                        workspace_input_d+offset_workspace_in,
-                        workspace_input_d+offset_workspace_in,
-                        model_weights_d,
-                        n_weight,
-                        model_biases_d,
-                        n_bias,
-                        model_structure,
-                        offset_alive_cell,
-                        alive_cells_d,
-                        world_id_d,
-                        n_layer,
-                        streams[stream_id]
-                    );
-                    CUDA_CHECK(cudaGetLastError());                  
-                    offset_alive_cell++;
-                    
-                } 
-                cudaDeviceSynchronize(); //fondamentale
+
+                launch_NN_forward(
+                    workspace_input_d,
+                    workspace_output_d,
+                    workspace_size,
+                    model_weights_d,
+                    n_weight,
+                    model_biases_d,
+                    n_bias,
+                    model_structure,
+                    limit_workspace_cell,
+                    alive_cells_d + offset_workspace,
+                    world_id_d,
+                    n_layer,
+                    0
+                );
+                CUDA_CHECK(cudaGetLastError());  
+
 
                 launch_output_elaboration(
                     world_value_d,
                     world_signal_d,
                     world_id_d,
                     world_contributions_d,
-                    workspace_input_d,
+                    workspace_output_d,
                     alive_cells_d + offset_workspace,
                     world_dim,
                     n_creature,
                     dim_output,
-                    dim_max_layer,
-                    limit_workspace,
+                    limit_workspace_cell,
                     energy_fraction,
                     0
                 );
                 CUDA_CHECK(cudaGetLastError());
 
-                offset_workspace = offset_alive_cell;
-                cudaDeviceSynchronize(); //fondamentale
+                offset_workspace += limit_workspace_cell;
+                //cudaDeviceSynchronize(); //fondamentale
 
 
             }
@@ -413,9 +404,16 @@ void simulazione(
                 energy_decay,
                 0
             );
-            CUDA_CHECK(cudaGetLastError());
 
+            cudaDeviceSynchronize();
+            
 
+            int new_n_cell = 0;
+            compact_with_thrust(world_id_d, alive_cells_d, *n_cell_alive_h, new_n_cell);
+            *n_cell_alive_h = new_n_cell;
+
+            
+            /*
             launch_find_index_cell_alive(
                 world_id_d,
                 world_dim*world_dim,
@@ -426,6 +424,7 @@ void simulazione(
                 0
             );
             CUDA_CHECK(cudaGetLastError());
+            */
 
 
             //VERSIONE CPU
@@ -628,8 +627,6 @@ void simulazione(
     
     printf("FREE DONE\n");
     
-
-    for(int i=0; i<n_stream; i++) cudaStreamDestroy(streams[i]);
 
     std::cout << "End Simulation. \n";
 }

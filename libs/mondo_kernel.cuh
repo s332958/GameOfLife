@@ -40,3 +40,5 @@ void launch_clean_around_cells(
     int* ncellule, 
     int window_size,
     cudaStream_t stream);
+
+void compact_with_thrust(int* mondo_id, int* alive_cells_d, int N, int &new_size);

@@ -4,48 +4,47 @@
 #include <cuda_runtime.h>
 
 // function to compute the inut of NN
-void launch_vision(
-    float* world_value,
-    int* world_id,
-    float* world_signaling,
-    int dim_world,
-    int* cell_idx,
-    int raggio,
-    float* input_workspace_addr,
-    int dim_max_layer,
-    int n_workspace,
+void launch_vision(                 
+    float* world_value,             
+    int* world_id,                  
+    float* world_signaling,        
+    int dim_world,                 
+    int* cell_idx,                 
+    int dim_window,                       
+    float* input_workspace,               
+    int limit_workspace_cell,
     cudaStream_t stream
 );
 
 // function that compute the value between the layer of NN
-void launch_NN_forward(
-    float* input_workspace_addr,
-    float* output_workspace_addr,
-    float* weights,
-    int n_weights,
-    float* biases,
-    int n_biases,
-    int* structure,
-    int cell_index,
-    int* cells,
-    int* world_id,
-    int dim_structure,
-    cudaStream_t stream
+void launch_NN_forward(                           
+    float* input_workspace,                  
+    float* output_workspace,                   
+    int workspace_size,
+    float* weights,                               
+    int n_weights,                                
+    float* biases,                                 
+    int n_biases,                                   
+    int* structure,   
+    int limit_workspace_cell,
+    int *cells,                                     
+    int *world_id,                                 
+    int dim_structure,                              
+    cudaStream_t stream    
 );
 
 // function that elaborate the output of NN
-void launch_output_elaboration(
-    float* world_value,
-    float* world_signal,
-    int* world_id,
-    float* contribution_matrix,
-    float* output_workspace_addr,
-    int* cells,
-    int world_dim,
-    int number_of_creatures,
-    int output_size,
-    int dim_max_layer,
-    int n_workspace,
+void launch_output_elaboration(              
+    float* world_value,                      
+    float* world_signal,                     
+    int* world_id,                        
+    float* contribution_matrix,           
+    float* output_workspace,              
+    int* cells,                           
+    int world_dim,                        
+    int number_of_creatures,              
+    int output_size,   
+    int limit_workspace_cell,
     float energy_fraction,
     cudaStream_t stream
 );

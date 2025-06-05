@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
+#include <thrust/device_ptr.h>
+#include <thrust/remove.h>
 #include <random>
 
 // =========================================================================================================
@@ -140,6 +142,11 @@ __global__ void world_update_kernel(
         if(final_value > 1.0f){
             final_value = 1.0f;
         }    
+        if(ID == 0 && final_id > 0){
+        
+            int pos = atomicAdd(cellCount, 1);
+            cells[pos-1] = index;
+        }
 
         // assing to the cell teh final value
         world_value[index] = final_value;                   
@@ -423,4 +430,42 @@ void launch_find_index_cell_alive(
     }
 
 
+}
+
+
+__global__ void mark_dead_cells_kernel(int* mondo_id, int* alive_cells_d, int N){
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if(idx >= N)return;
+    int ID = mondo_id[alive_cells_d[idx]];
+    if(ID < 1){
+        alive_cells_d[idx] = -1;
+    }
+
+}
+
+void compact_with_thrust(int* mondo_id, int* alive_cells_d, int N, int &new_size) {
+    int n_thread_per_block = 1024; 
+    int thread_number = N;
+    int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
+
+    mark_dead_cells_kernel<<<n_block,n_thread_per_block,0>>>(
+        mondo_id,
+        alive_cells_d,
+        N
+    );
+
+    // 1) Wrap del raw pointer in un device_ptr di Thrust
+    thrust::device_ptr<int> dev_ptr(alive_cells_d);
+
+    // 2) Lancio remove_if con predicato “x < 0” → sposterà tutti gli x >= 0 in testa
+    //    e restituirà un iterator al “new end”.
+    auto new_end = thrust::remove_if(
+        dev_ptr, 
+        dev_ptr + N, 
+        thrust::placeholders::_1 < 0
+    );
+
+    // 3) Calcolo la nuova dimensione
+    new_size = static_cast<int>(new_end - dev_ptr);
+    // Da questo momento gli elementi validi stanno in alive_cells_d[0..new_size-1].
 }

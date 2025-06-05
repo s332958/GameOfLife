@@ -24,18 +24,17 @@ __global__ void vision_kernel(
     int* cell_idx,
     int dim_window,
     float* workspace,
-    int n_workspace,
-    int dim_input,
-    int dim_max_layer
+    int limit_workspace_cell,
+    int dim_input
 ) 
 {
 
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int index_cell = index / dim_max_layer;
-    int vision_index = index % dim_max_layer;
+    int index_cell = index / dim_input;
+    int vision_index = index % dim_input;
     
-    if (index >= dim_max_layer*n_workspace || vision_index >= dim_input) return;
+    if (index >= dim_input*limit_workspace_cell) return;
 
     int dim_window_sq = dim_window*dim_window;
     int radius = dim_window / 2;
@@ -78,79 +77,75 @@ __global__ void vision_kernel(
 // ============================================================================
 
 
-__global__ void NN_forward_kernel(
-    float* input_addr,
-    float* output_addr, 
+__global__ void NN_forward_weight_kernel(
+    float* input,
+    float* output, 
     float* weights, 
-    float* biases, 
-    int cell_index, 
     int* cells,
     int* world_id, 
     int n_weights, 
-    int n_biases, 
-    int layer1_size, 
+    int limit_workspace_cell,
+    int layer1_size,
     int layer2_size,
-    int offset_weights,
-    int offset_biases
+    int offset_weights
 ){
         // index del thread 
         int tidx = blockIdx.x * blockDim.x + threadIdx.x;
 
         // se il thread supera la dim dei weights  allora ritorno 
-        if (tidx >= layer2_size * layer1_size){
+        if (tidx >= layer1_size * layer2_size * limit_workspace_cell){
             return;
         }
-
-        // ottengo l'indice di dove si trova la cella viva cosi poi accedo al suo ID per capire che modello usare
+        int cell_index = tidx / (layer1_size * layer2_size);
+        int weight_index = tidx % (layer1_size * layer2_size);
+       
         int world_index = cells[cell_index];
         int ID = world_id[world_index];
-        //printf("thread: %d ID: %d index: %d \n",tidx, ID, world_index);
+                
+        int true_weight_index = n_weights * (ID - 1) + weight_index + offset_weights; // + offset pesi siccome dipendono dal layer (es layer0 offeset=0, layer1 offset=layer0*layer1)
+         
+        int input_neuron_idx  = weight_index % layer1_size;
+        int output_neuron_idx = weight_index / layer1_size;
 
-        //if (ID <= 0)return;
-
-        // ottengo l'accesso ai pesi del modello corretto 
-        int weight_index = n_weights * (ID - 1) + tidx + offset_weights; // + offset pesi siccome dipendono dal layer (es layer0 offeset=0, layer1 offset=layer0*layer1)
+        int input_index  = cell_index * layer1_size  + input_neuron_idx;
+        int output_index = cell_index * layer2_size  + output_neuron_idx;
+            
+        float weighted = weights[true_weight_index] * input[input_index];
+      
+        atomicAdd(&output[output_index], weighted);
         
-        // assegno ad ogni thread la cella da cui leggere l'input e dove assegnare il suo output
-        int output_index = tidx % layer2_size;
-        int input_index = tidx / layer2_size;
-        
-        // ottengo per ogni thread il suo input*weight
-        float weighted = weights[weight_index] * input_addr[input_index];
+}
 
-        // pulisco le celle di memoria che mi servono in output
-        if (tidx < layer2_size){
-            output_addr[tidx] = 0;
-        }
-        /*
-        
-        printf("thread in azione: %4d, ID: %4d, weight: %4d, output_idx: %4d, input_idx: %4d\n",tidx, ID, weight_index, output_index, input_index);
-        printf("thread: %4d, input: %4.4f, weight: %4.4f, input_weight: %4.4f output: %d\n",tidx,input_addr[input_index],weights[weight_index],weighted,output_index);
-        */
-
-        __syncthreads();
-
-        // sommo per ogni cella di output i propri pesi
-        atomicAdd(&output_addr[output_index], weighted);
-        
-        // blocco tutti i thread che hanno id maggiore della dimensione dei bias del layer di output
-        if (tidx >= layer2_size){
+__global__ void NN_forward_bias_kernel(
+    float* output, 
+    float* biases, 
+    int* cells,
+    int* world_id, 
+    int n_biases, 
+    int limit_workspace_cell,
+    int layer2_size,
+    int offset_biases
+){
+        // index del thread 
+        int tidx = blockIdx.x * blockDim.x + threadIdx.x;
+       
+        if (tidx >= layer2_size * limit_workspace_cell){
             return;
         }
-        
-        // otttengo i bias realitivi in base al modello corretto
-        int bias_index = n_biases * (ID - 1) + tidx + offset_biases;  // + offset pesi siccome dipendono dal layer (es layer1 offeset=0, layer2 offset=layer1)
+        int cell_index = tidx / layer2_size;
+        int bias_index = tidx % layer2_size;
 
+        int world_index = cells[cell_index];
+        int ID = world_id[world_index];
 
-        //printf("thread in azione: %4d, ID: %4d, bias_index: %4d\n",tidx, ID, bias_index);
+        int true_bias_index = n_biases * (ID - 1) + bias_index + offset_biases;
 
-        // sommo il bias alla cella di output corretta
-        output_addr[tidx] += biases[bias_index];
+        output[tidx] += biases[true_bias_index];
         // printf("thread: %4d, bias: %.4f totale_dopo: %4.4f \n",tidx,biases[bias_index],output_addr[tidx]);
 
         // applico la relu ad ogni cella di output modificata 
-        output_addr[tidx] = fast_sigmoid(output_addr[tidx]);
-
+        output[tidx] = fast_sigmoid(output[tidx]);
+        
 }
 
 //===================================================================================
@@ -167,16 +162,15 @@ __global__ void output_elaboration_kernel(
     int number_of_creatures,
     int output_size,
     int dim_window,
-    int dim_max_layer,
-    int n_workspace,
+    int limit_workspace_cell,
     float energy_fraction
 ){  
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int index_cell = index / dim_max_layer;
-    int output_index = index % dim_max_layer;
+    int index_cell = index / output_size;
+    int output_index = index % output_size;
     
-    if (index >= dim_max_layer*n_workspace || output_index >= output_size) return;
+    if (index >= output_size*limit_workspace_cell) return;
     
     int center_index = cells[index_cell];
 
@@ -321,22 +315,21 @@ __global__ void recombine_models_kernel(
 //=================================================================================
 
 // Wrapper kernel visione
-void launch_vision(                 // Testata e funzionante 
-    float* world_value,                         // mondo che contiene i valori
-    int* world_id,                              // mondo che contiene gli id
-    float* world_signaling,                     // mondo che contiene i signaling
-    int dim_world,                              // dimensione del mondo 
-    int* cell_idx,                              // cella di memoria della cellula viva
-    int dim_window,                                 // raggio di visione della cellula 
-    float* input_workspace,                // indirizzo della stazione di input su cui scrivere il risultato (dim area di memoria = raggio*raggio*3)    
-    int dim_max_layer,
-    int n_workspace,
+void launch_vision(                 
+    float* world_value,             
+    int* world_id,                  
+    float* world_signaling,        
+    int dim_world,                 
+    int* cell_idx,                 
+    int dim_window,                       
+    float* input_workspace,               
+    int limit_workspace_cell,
     cudaStream_t stream
 ){
 
     int n_thread_per_block = 1024;
     int dim_input = dim_window * dim_window * 2;
-    int thread_number = dim_max_layer * n_workspace;
+    int thread_number = dim_input * limit_workspace_cell;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
     vision_kernel<<<n_block,n_thread_per_block,0,stream>>>(
         world_value,
@@ -346,9 +339,8 @@ void launch_vision(                 // Testata e funzionante
         cell_idx,
         dim_window,
         input_workspace,
-        n_workspace,
-        dim_input,
-        dim_max_layer
+        limit_workspace_cell,
+        dim_input
     );
     //if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori vision_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));          
 
@@ -358,57 +350,69 @@ void launch_vision(                 // Testata e funzionante
 // ===================================================================================================
 
 // Wrapper kernel NN_forward
-// Limitazione i layer successivi devono avere dim dimnore del layer iniziale
-// Usare una sola cella di memoria
-void launch_NN_forward(                                     // Testata e funzionante
-    float* input_workspace_addr,                    //inizio memoria zona di input
-    float* output_workspace_addr,                   //inizio memoria zona di output
-    float* weights,                                 //pesi di tutti i modelli
-    int n_weights,                                  //pesi x modello
-    float* biases,                                  //biases tutti i modelli
-    int n_biases,                                   //biases x modello
-    int* structure,                                 //vettore con le dimensioni dei layer di modelli (tutti i modelli hanno le stesse dim)
-    int cell_index,                                 //indice della cellula viva che si usa per calcolare l'input
-    int *cells,                                     //array delle cellule vive
-    int *world_id,                                  //mondo che contiene gli id delle celle
-    int dim_structure,                              //numero di layer del modello (tutti i modelli hanno lo stesso numero di layer)
+void launch_NN_forward(                           
+    float* input_workspace,                  
+    float* output_workspace,                   
+    int workspace_size,
+    float* weights,                               
+    int n_weights,                                
+    float* biases,                                 
+    int n_biases,                                   
+    int* structure,     
+    int limit_workspace_cell,
+    int *cells,                                     
+    int *world_id,                                 
+    int dim_structure,                              
     cudaStream_t stream    
 ){
     int n_thread_per_block = 1024;
     int layer1_size = 0;
     int layer2_size = 0;
-    int structureLenght = dim_structure;
-    // printf("STRUCTURE LENGHT: %d",structureLenght);
-    // int layerInput_size = structure[0];
-    // int layerOutput_size = structure[structureLenght];
     int weight_offset = 0;
     int biases_offset = 0;
 
-    for(int i=0; i < (structureLenght-1); i++){
+    for(int i=0; i < (dim_structure-1); i++){
+
         layer1_size = structure[i];
         layer2_size = structure[i + 1];
 
-        int thread_number = layer1_size * layer2_size;             
+        int thread_number = layer1_size * layer2_size * limit_workspace_cell;             
 
         int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
-        NN_forward_kernel<<<n_block, n_thread_per_block, 0 , stream>>>(
-            input_workspace_addr,
-            output_workspace_addr, 
+        NN_forward_weight_kernel<<<n_block, n_thread_per_block, 0 , stream>>>(
+            input_workspace,
+            output_workspace, 
             weights, 
-            biases, 
-            cell_index, 
             cells, 
             world_id, 
             n_weights, 
-            n_biases, 
+            limit_workspace_cell,
             layer1_size, 
             layer2_size, 
-            weight_offset, 
-            biases_offset
+            weight_offset
         );  
+
+        thread_number = layer2_size * limit_workspace_cell;             
+        n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
+
+
+        NN_forward_bias_kernel<<<n_block, n_thread_per_block, 0 , stream>>>(
+            output_workspace, 
+            biases, 
+            cells, 
+            world_id, 
+            n_biases, 
+            limit_workspace_cell,
+            layer2_size, 
+            biases_offset
+        ); 
         //if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori NN_forward_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
-           
+        cudaMemcpy(input_workspace, output_workspace, workspace_size*limit_workspace_cell, cudaMemcpyDeviceToDevice);
+        
+        if (i < (dim_structure-2)){
+            cudaMemset(output_workspace, 0, workspace_size*limit_workspace_cell);
+        }
         weight_offset += layer1_size*layer2_size;
         biases_offset += layer2_size;
 
@@ -419,24 +423,23 @@ void launch_NN_forward(                                     // Testata e funzion
 // ===================================================================================================
 
 //Wrapper kernel output_elaboration
-void launch_output_elaboration(                                 // Funziona e testata
-    float* world_value,                             // matrice mondo valori
-    float* world_signal,                            // matrice che contiene i signaling
-    int* world_id,                                  // matrice mondo che contiene gli id per cella
-    float* contribution_matrix,                     // matrice dei contributi di ogni creatura
-    float* output_workspace,                   // area di memoria dell'output del workspace
-    int* cells,                                     // array cellule vive
-    int world_dim,                                  // dimensione del mondo
-    int number_of_creatures,                        // numero di creature massime nel mondo
-    int output_size,                                // dimensione dell'output
-    int dim_max_layer,
-    int n_workspace,
+void launch_output_elaboration(              
+    float* world_value,                      
+    float* world_signal,                     
+    int* world_id,                        
+    float* contribution_matrix,           
+    float* output_workspace,              
+    int* cells,                           
+    int world_dim,                        
+    int number_of_creatures,              
+    int output_size,   
+    int limit_workspace_cell,
     float energy_fraction,
     cudaStream_t stream
 ){
     int window_size = sqrt(output_size - 1);
     int n_thread_per_block = 1024;
-    int thread_number = n_workspace * dim_max_layer;
+    int thread_number = limit_workspace_cell * output_size;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
     output_elaboration_kernel<<<n_block, n_thread_per_block, 0, stream>>>(
@@ -450,8 +453,7 @@ void launch_output_elaboration(                                 // Funziona e te
         number_of_creatures,
         output_size,
         window_size,
-        dim_max_layer,
-        n_workspace,
+        limit_workspace_cell,
         energy_fraction
     );
     //if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori output_elaboration_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
