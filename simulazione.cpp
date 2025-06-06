@@ -397,10 +397,8 @@ void simulazione(
                 world_id_d,
                 world_signal_d,
                 world_contributions_d,
-                alive_cells_d,
                 world_dim,
                 n_creature,
-                n_cell_alive_d,
                 energy_decay,
                 0
             );

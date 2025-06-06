@@ -53,8 +53,6 @@ __global__ void world_update_kernel(
     float *contribution_matrix,
     int dim_world, 
     int number_of_creatures, 
-    int *cellCount, 
-    int *cells,
     float energy_decay
 )
     {                 
@@ -142,11 +140,6 @@ __global__ void world_update_kernel(
         if(final_value > 1.0f){
             final_value = 1.0f;
         }    
-        if(ID == 0 && final_id > 0){
-        
-            int pos = atomicAdd(cellCount, 1);
-            cells[pos-1] = index;
-        }
 
         // assing to the cell teh final value
         world_value[index] = final_value;                   
@@ -211,10 +204,8 @@ void launch_world_update(
     int *id_matrix,
     float *world_signal,
     float *contribution_matrix, 
-    int *cells,
     int world_dim, 
     int number_of_creatures,
-    int *cellCount, 
     float energy_decay,
     cudaStream_t stream
 ){
@@ -231,8 +222,6 @@ void launch_world_update(
         contribution_matrix,
         world_dim,
         number_of_creatures,
-        cellCount,
-        cells,
         energy_decay
     );
 

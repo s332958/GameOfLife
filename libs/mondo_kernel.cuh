@@ -13,10 +13,8 @@ void launch_world_update(float* world_value,
                          int* id_matrix,
                          float* world_signal,
                          float* contribution_matrix, 
-                         int* cells,
                          int world_dim, 
                          int number_of_creatures,
-                         int* cellCount, 
                          float energy_decay,
                          cudaStream_t stream);
 
