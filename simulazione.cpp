@@ -387,11 +387,11 @@ void simulazione(
                 CUDA_CHECK(cudaGetLastError());
 
                 offset_workspace += limit_workspace_cell;
-                //cudaDeviceSynchronize(); //fondamentale
+                cudaDeviceSynchronize(); //fondamentale
 
 
             }
-            
+            cudaDeviceSynchronize();
             launch_world_update(
                 world_value_d,
                 world_id_d,
@@ -401,15 +401,14 @@ void simulazione(
                 n_creature,
                 energy_decay,
                 0
-            );
-
-            //cudaDeviceSynchronize();
+            ); 
             
-
+            cudaDeviceSynchronize();        
+            
             int new_n_cell = 0;
             compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell);
             *n_cell_alive_h = new_n_cell;
-
+            
             
             /*
             launch_find_index_cell_alive(
@@ -485,6 +484,8 @@ void simulazione(
                 glfwPollEvents();              
 
             } 
+
+            
 
             // ======================================== Aggiornamento vettori valutazione occupazione ed energia
             launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature, 0);

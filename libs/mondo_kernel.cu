@@ -78,78 +78,103 @@ __global__ void world_update_kernel(
         
         // use a for cicle to find the model that give more contribution
         int max_id = 0;
+        int fighters = 0;
         float max_value = 0;
         float ally_energy = 0;
         float enemy_energy = 0;
+        float soglia_morte = 0.0f;
         
         for(int i = 0; i < number_of_creatures; i++){
             // get the contribution value given id (i) and offset cell
             float value = contribution_matrix[i * dim_world * dim_world + index]; 
-            if (ID == i+1){
-                // if contribution is from  a creature with the same ID cell, so raise the allay energy
-                ally_energy += value;      
-            }    
-            else{
-                // if contribution is from a creature with different ID cell, raise enemy energy
-                enemy_energy += value;
-            }
-            // save the most creature that give more energy and the energy that it gives                  
-            if (value > max_value){
-                max_value = value;
-                max_id = i+1;
-            }    
+            if (value > 0){
+                fighters += 1;
+                             
+                if (ID == i+1){
+                    // if contribution is from  a creature with the same ID cell, so raise the allay energy
+                    ally_energy += value;      
+                }    
+                else{
+                    // if contribution is from a creature with different ID cell, raise enemy energy
+                    enemy_energy += value;
+                }
+                // save the most creature that give more energy and the energy that it gives 
+                if (value > max_value){
+                    max_value = value;
+                    max_id = i+1;
+                } 
+            }   
         } 
 
-        // if the cell is empty
-        if (ID == 0){
-            if (enemy_energy > 0){
-                
-                // the final value is compute by the formula below
-                // assing the id at the creature with most contribution
-                final_value = starting_value * (max_value / enemy_energy) + max_value;
-                final_id = max_id;
 
-            }else{
-                world_signal[index] = 0;
-            }    
-        } 
-        
-        // if the cell is occupied
-        else{
+
+
+        if(ID > 0){
+            float energy = starting_value + ally_energy - enemy_energy - energy_decay;
             
-            if (starting_value + ally_energy - enemy_energy < 0){
-                // if the enemy cell is greater than staring value plus ally energy, set the final energy as the difference between the two value and final id equal 0 
-                final_value = abs(starting_value + ally_energy - enemy_energy);
+            if (energy < 0){
+                final_value = 0;
                 final_id = 0;
             }            
             else{
-                //if starting value plus ally cell is grater than enemy energy, set final vlaue as difference between the two value
-                final_value = starting_value + ally_energy - enemy_energy;
+                final_value = energy;
             }
 
-            // after the computation apply the energy decay
-            final_value = final_value - energy_decay;    
-        }    
-        // if the final energy is less then 0.02 the id return to 0
-        if(final_value < 0.02f){
-            final_id = 0;
-        }     
-        if(final_value < 0.0f){
-            final_value = 0;
+            if(final_value < soglia_morte){
+                final_id = 0;
+            }    
+
+            world_value[index] = final_value;
+            id_matrix[index] = final_id;
+            return;
+        } else{
+        if (fighters < 1){
+            return;
         }
-        /*
+
         
-        
-        // if the final value exceed the max (1.0) cap the value to max
-        if(final_value > 1.0f){
-            final_value = 1.0f;
+        if(starting_value > soglia_morte){
+            float tot_energy = (starting_value > enemy_energy) ? enemy_energy : starting_value;
+            tot_energy = tot_energy * 10; 
+            int window_size = 3;
+            int radius = window_size / 2;
+
+            int center_x = index % dim_world;
+            int center_y = index / dim_world;
+
+            int filter_x;
+            int filter_y;
+            int filter_index;
+            float filter_energy = tot_energy /( (window_size * window_size)-1);
+
+            for (int i = 0; i < window_size; i++){
+                for (int j = 0; j < window_size; j++){
+                    filter_x = (center_x - radius + i + dim_world) % dim_world;
+                    filter_y = (center_y - radius + j + dim_world) % dim_world;
+
+                    filter_index = filter_y * dim_world + filter_x;
+                    if(filter_index != index){
+                        atomicAdd(&world_value[filter_index], filter_energy);                            
+                    }
+                }
+            } 
+            atomicAdd(&world_value[index], -tot_energy);
+            id_matrix[index] = 0;   
+
+        }else{
+            if(fighters == 1){
+                final_value = max_value;
+                final_id = max_id;
+            }else{
+                final_value = starting_value + max_value - ((enemy_energy - max_value) / (fighters - 1));
+                final_id = max_id;                
+            }
+            world_value[index] = final_value;
+            id_matrix[index] = final_id;
+
         }    
-        */
-
-        // assing to the cell teh final value
-        world_value[index] = final_value;                   
-        id_matrix[index] = final_id; 
-
+        world_signal[index] = 0;    
+    }
 }    
     
     //================================================================================

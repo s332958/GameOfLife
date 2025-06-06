@@ -70,7 +70,7 @@ __global__ void mappa_colori_kernel(float* mondo, int* id_matrix, float* mondo_r
         mondo_rgb[out_index] = value;  // gray scale for neutral cell
     }
     else{
-        mondo_rgb[out_index] = COLORI[ID - 1][channel] * (value + 0.01) * 5;
+        mondo_rgb[out_index] = COLORI[ID - 1][channel] * (value + 0.005) * 5;
     }
 
 }
