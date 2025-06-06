@@ -433,25 +433,29 @@ void launch_find_index_cell_alive(
 }
 
 
-__global__ void mark_dead_cells_kernel(int* mondo_id, int* alive_cells_d, int N){
+__global__ void alive_cells_builder_kernel(int* mondo_id, int* alive_cells_d, int thread_number){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if(idx >= N)return;
-    int ID = mondo_id[alive_cells_d[idx]];
-    if(ID < 1){
+    if(idx >= thread_number)return;
+    int ID = mondo_id[idx];
+    if(ID > 0){
+        alive_cells_d[idx] = idx;
+    }else{
         alive_cells_d[idx] = -1;
     }
 
 }
 
-void compact_with_thrust(int* mondo_id, int* alive_cells_d, int N, int &new_size) {
+void compact_with_thrust(int* mondo_id, int* alive_cells_d, int dim_world, int &new_size) {
+    cudaMemset(alive_cells_d, 0, dim_world * dim_world * sizeof(float));
+
     int n_thread_per_block = 1024; 
-    int thread_number = N;
+    int thread_number = dim_world*dim_world;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
-    mark_dead_cells_kernel<<<n_block,n_thread_per_block,0>>>(
+    alive_cells_builder_kernel<<<n_block,n_thread_per_block,0>>>(
         mondo_id,
         alive_cells_d,
-        N
+        thread_number
     );
 
     // 1) Wrap del raw pointer in un device_ptr di Thrust
@@ -461,7 +465,7 @@ void compact_with_thrust(int* mondo_id, int* alive_cells_d, int N, int &new_size
     //    e restituirà un iterator al “new end”.
     auto new_end = thrust::remove_if(
         dev_ptr, 
-        dev_ptr + N, 
+        dev_ptr + thread_number, 
         thrust::placeholders::_1 < 0
     );
 

@@ -409,7 +409,7 @@ void simulazione(
             
 
             int new_n_cell = 0;
-            compact_with_thrust(world_id_d, alive_cells_d, *n_cell_alive_h, new_n_cell);
+            compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell);
             *n_cell_alive_h = new_n_cell;
 
             
