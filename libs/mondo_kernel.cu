@@ -130,16 +130,21 @@ __global__ void world_update_kernel(
             // after the computation apply the energy decay
             final_value = final_value - energy_decay;    
         }    
-        
         // if the final energy is less then 0.02 the id return to 0
         if(final_value < 0.02f){
-           final_id = 0;
+            final_id = 0;
         }     
+        if(final_value < 0.0f){
+            final_value = 0;
+        }
+        /*
+        
         
         // if the final value exceed the max (1.0) cap the value to max
         if(final_value > 1.0f){
             final_value = 1.0f;
         }    
+        */
 
         // assing to the cell teh final value
         world_value[index] = final_value;                   

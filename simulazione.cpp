@@ -403,7 +403,7 @@ void simulazione(
                 0
             );
 
-            cudaDeviceSynchronize();
+            //cudaDeviceSynchronize();
             
 
             int new_n_cell = 0;
