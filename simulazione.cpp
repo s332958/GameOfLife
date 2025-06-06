@@ -387,11 +387,11 @@ void simulazione(
                 CUDA_CHECK(cudaGetLastError());
 
                 offset_workspace += limit_workspace_cell;
-                cudaDeviceSynchronize(); //fondamentale
+                //cudaDeviceSynchronize(); //fondamentale
 
 
             }
-            cudaDeviceSynchronize();
+            //cudaDeviceSynchronize();
             launch_world_update(
                 world_value_d,
                 world_id_d,
@@ -403,7 +403,7 @@ void simulazione(
                 0
             ); 
             
-            cudaDeviceSynchronize();        
+            //cudaDeviceSynchronize();        
             
             int new_n_cell = 0;
             compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell);

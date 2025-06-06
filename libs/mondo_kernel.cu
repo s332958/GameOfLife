@@ -82,7 +82,7 @@ __global__ void world_update_kernel(
         float max_value = 0;
         float ally_energy = 0;
         float enemy_energy = 0;
-        float soglia_morte = 0.0f;
+        float soglia_morte = 0.02f;
         
         for(int i = 0; i < number_of_creatures; i++){
             // get the contribution value given id (i) and offset cell
@@ -133,9 +133,9 @@ __global__ void world_update_kernel(
         }
 
         
-        if(starting_value > soglia_morte){
+        if(starting_value > 0){
             float tot_energy = (starting_value > enemy_energy) ? enemy_energy : starting_value;
-            tot_energy = tot_energy * 10; 
+            tot_energy = tot_energy * 4; 
             int window_size = 3;
             int radius = window_size / 2;
 
