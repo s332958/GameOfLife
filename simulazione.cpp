@@ -291,7 +291,7 @@ void simulazione(
 
         // - Aggiunta cibo al mondo
         // - Possibile ottimizzazione togliendo i curandstate
-        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 0.3f, 1.0f, random_threshold_food, 0);
+        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 1.0f, 10.0f, random_threshold_food, 0);
         CUDA_CHECK(cudaGetLastError());
 
         launch_clean_around_cells(world_value_d, world_id_d, world_dim, alive_cells_d, n_cell_alive_h, clean_window_size, 0);
