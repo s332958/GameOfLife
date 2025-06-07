@@ -238,10 +238,6 @@ void simulazione(
         std::cout << "=======================  Epoca: " << epoca << "  ========================\n";
 
 
-
-        
-        //std::memset(world_value_h, 0, tot_world_dim_size_float);
-        //std::memset(world_id_h, 0, tot_world_dim_size_int);
         std::memset(alive_cells_h, 0, tot_world_dim_size_int);
 
         cudaMemset(world_signal_d, 0, tot_world_dim_size_float);    
@@ -257,7 +253,7 @@ void simulazione(
 
         printf("RESET ALL MATRIX \n"); 
 
-                // - Aggiunta ostacoli perlin al mondo
+        // - Aggiunta ostacoli perlin al mondo
         launch_perlinNoise_obstacles(world_dim, world_id_d, PN_scale_obstacles, PN_threshold_obstacles, 0);
         CUDA_CHECK(cudaGetLastError());
         
@@ -406,7 +402,7 @@ void simulazione(
                 CUDA_CHECK(cudaGetLastError());
 
                 offset_workspace += limit_workspace_cell;
-                //cudaDeviceSynchronize(); //fondamentale
+                cudaDeviceSynchronize(); //fondamentale
 
 
             }
@@ -422,61 +418,11 @@ void simulazione(
                 0
             ); 
             
-            //cudaDeviceSynchronize();        
+            cudaDeviceSynchronize();        
             
             int new_n_cell = 0;
             compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell);
             *n_cell_alive_h = new_n_cell;
-            
-            
-            /*
-            launch_find_index_cell_alive(
-                world_id_d,
-                world_dim*world_dim,
-                alive_cells_d,
-                n_cell_alive_d,
-                n_cell_alive_h,
-                support_vector_d,
-                0
-            );
-            CUDA_CHECK(cudaGetLastError());
-            */
-
-
-            //VERSIONE CPU
-            /*
-            launch_cell_alive_check(
-                alive_cells_d,
-                n_cell_alive_h,
-                world_id_d,
-                0
-            );    
-            cuda_memcpy(alive_cells_h, alive_cells_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, 0);
-            CUDA_CHECK(cudaGetLastError());  
-            int local_cellN = *n_cell_alive_h;
-            int counter = 0;
-            
-            for(int i = 0; i < local_cellN; i++){
-                if(alive_cells_h[i] >= 0){
-                    alive_cells_h[counter] = alive_cells_h[i];
-                    //printf("%d  ",alive_cells_h[counter]);
-                    counter += 1;
-                }
-            }
-            *n_cell_alive_h = counter;
-            
-            cuda_memcpy(alive_cells_d, alive_cells_h, tot_world_dim_size_int, cudaMemcpyHostToDevice, cc_major, 0);
-            CUDA_CHECK(cudaGetLastError());
-                        // - Ritorno alive_cell_d
-            cuda_memcpy(alive_cells_h, alive_cells_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, streams[0]);
-            CUDA_CHECK(cudaGetLastError());   
-            std::cout << "\n=== ALIVE CELLS ===\n";
-            for (int i = 0; i < *n_cell_alive_h; i++) {
-                std::cout << "Alive[" << i << "] = " << alive_cells_h[i] << "\n";
-                std::cout << " (" << world_id_h[alive_cells_h[i]] << ")\n";
-
-            }
-            */
 
             if(render){
 
@@ -517,13 +463,6 @@ void simulazione(
             long elapsed_us = (end.tv_sec - start.tv_sec) * 1000000 +
                             (end.tv_nsec - start.tv_nsec) / 1000;
 
-            //printf("Step: %10s \t alive_cell: %8d  |  %3.1f it/s \n",epocstep,*n_cell_alive_h,1.0f/((float)(end - start) / CLOCKS_PER_SEC));
-            /*
-            
-            if (elapsed_us < FRAME_TIME_US) {
-                usleep(FRAME_TIME_US - elapsed_us);
-            }
-                */
         }
 
         // -------------------------------------------
