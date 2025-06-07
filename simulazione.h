@@ -39,6 +39,8 @@ struct Simulation_setup {
     int clean_window_size;
     char file_model[200];
     bool watch_signaling;
+    float alpha;
+    float std;
 
     Simulation_setup(
         int world_dim = 400,
@@ -69,7 +71,9 @@ struct Simulation_setup {
         int clean_window_size = 11,
         bool load = false,
         int scale = 1,
-        bool watch_signaling = false
+        bool watch_signaling = false,
+        float alpha = 0.1,
+        float std = 1
     )
         : world_dim(world_dim),
           n_creature(n_creature),
@@ -101,7 +105,9 @@ struct Simulation_setup {
           load(load),
           scale(scale),
           file_model(""),
-          watch_signaling(watch_signaling)
+          watch_signaling(watch_signaling),
+          alpha(alpha),
+          std(std)
     {
         int offset = 0;
         for(int i=0; i<n_layer; i++){

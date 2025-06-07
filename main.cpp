@@ -96,6 +96,10 @@ void parse_args(int argc, char** argv, Simulation_setup& setup) {
                 else offset += sprintf(setup.file_model + offset, "%d.txt", setup.model_structure[i]);
             }
             printf("Model file: %s \n",setup.file_model);
+        }else if ( arg == "-alpha" && i + 1 < argc){
+            setup.alpha = std::stof(argv[++i]);
+        }else if (arg == "-std" && i + 1 < argc){
+            setup.std = std::stof(argv[++i]);
         }
     }
 }

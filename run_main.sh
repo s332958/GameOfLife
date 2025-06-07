@@ -7,7 +7,7 @@
   -n_creature 2 \
   -eval_method 0 \
   -reserve_memory 50 \
-  -checkpoint_epoch 5 \
+  -checkpoint_epoch 1 \
   -pn_scale_obstacles 14.5 \
   -pn_threshold_obstacles 0.8 \
   -pn_scale_food 10.0 \
@@ -22,6 +22,8 @@
   -mutation_range 0.04 \
   -clean_window_size 3 \
   -model_structure 18,10 \
+  -std 2 \
+  -alpha 0.01 \
   -render \
   -load
 
@@ -48,9 +50,11 @@
   # -mutation_range FLOAT \
   # -clean_window_size INT \
   # -model_structure INT,INT.. \
-  # -load \
-  # -render \
-  # -watch_signaling
+  # -load BOOL\
+  # -render BOOL\
+  # -watch_signaling BOOL \
+  # -alpha FLOAT \
+  # -std FLOAT
 
 
 # nsys profile ./main.exe \

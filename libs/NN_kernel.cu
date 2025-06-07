@@ -218,8 +218,7 @@ __global__ void compute_energy_and_occupation_kernel(
     float* occupation_vector,
     float* energy_vector,
     int world_dim,
-    int n_creature,
-    int n_steps
+    int n_creature
 ) {
 
     int index = blockDim.x * blockIdx.x + threadIdx.x;
@@ -475,7 +474,6 @@ void launch_compute_energy_and_occupation(
     float* energy_vector,
     int world_dim,
     int n_creature,
-    int n_steps,
     cudaStream_t stream
 ){
 
@@ -490,8 +488,7 @@ void launch_compute_energy_and_occupation(
         occupation_vector,
         energy_vector,
         world_dim,
-        n_creature,
-        n_steps
+        n_creature
     );
 
 
@@ -650,7 +647,8 @@ __global__ void update_model_kernel(
     int    n_biases,
     int    n_creature,
     float  alpha,
-    float  std
+    float  std,
+    int n_steps
 ){
 
     __shared__ float shared_mem;
@@ -689,7 +687,7 @@ __global__ void update_model_kernel(
 
         val = shared_mem;
 
-        val = (val * alpha) / (n_creature * std);
+        val = (val * alpha) / (n_creature * std * n_steps);
         biases_starting_model[params_idx] += val;
 
     }
@@ -708,6 +706,7 @@ void launch_update_model(
     int    n_creature,
     float  alpha,
     float  std,
+    int n_steps,
     cudaStream_t stream
 ){
 
@@ -725,7 +724,8 @@ void launch_update_model(
         n_biases,
         n_creature,
         alpha,
-        std
+        std,
+        n_steps
     );
 
 }

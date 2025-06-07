@@ -58,7 +58,6 @@ void launch_compute_energy_and_occupation(
     float* energy_vector,
     int world_dim,
     int n_creature,
-    int n_steps,
     cudaStream_t stream
 );
 
@@ -87,6 +86,7 @@ void launch_update_model(
     int    n_creature,
     float  alpha,
     float  std,
+    int n_steps,
     cudaStream_t stream
 );
 

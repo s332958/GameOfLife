@@ -75,8 +75,8 @@ void simulazione(
 
     unsigned long seed = (unsigned long)time(NULL);
 
-    float std = 1.0f;
-    float alpha = 0.01f;
+    float std = simulation_setup.std;
+    float alpha = simulation_setup.alpha;
 
     // -------------------------------------------
     // PRE-FASE : Info GPU
@@ -478,7 +478,7 @@ void simulazione(
             
 
             // ======================================== Aggiornamento vettori valutazione occupazione ed energia
-            launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature, N_STEPS, 0);
+            launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature, 0);
             CUDA_CHECK(cudaGetLastError());
 
             clock_gettime(CLOCK_MONOTONIC, &end); 
@@ -509,6 +509,7 @@ void simulazione(
             n_creature,
             alpha,
             std,
+            N_STEPS,
             0
         );    
 
@@ -526,8 +527,8 @@ void simulazione(
                 else tot_energy += energy_vector_h[i];
             }
 
-            if(METHOD_EVAL==0) append_score_to_file("Occupations_points.txt",tot_occupation);
-            else append_score_to_file("Energy_points",tot_energy); 
+            if(METHOD_EVAL==0) append_score_to_file("points/Occupations_points.txt",tot_occupation/N_STEPS);
+            else append_score_to_file("points/Energy_points.txt",tot_energy/N_STEPS); 
 
             save_model_on_file(path_save_file,model_weights_h,model_biases_h,n_weight,n_bias);
         }       
