@@ -68,7 +68,7 @@ __global__ void world_update_kernel(
         // if the cell is occupated from an obstacles set -1 value and return
         // FORSE SI PUO TOGLIERE IL -1
         if(ID == -1) {
-            world_value[index] = -1;
+            world_value[index] = -10;
             return;
         }
         

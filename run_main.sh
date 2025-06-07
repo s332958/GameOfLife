@@ -1,30 +1,30 @@
 #!/bin/bash
 nsys profile
 compute-sanitizer --tool memcheck --log-file sanitazer_report.txt  ./main.exe \
-  -ep 100 \
-  -st 2000 \
-  -scale 8 \
-  -world_dim 128 \
-  -n_creature 15 \
+  -ep 10000000 \
+  -st 4000 \
+  -scale 5 \
+  -world_dim 256 \
+  -n_creature 200 \
   -eval_method 0 \
   -reserve_memory 50 \
-  -checkpoint_epoch 10 \
-  -pn_scale_obstacles 15.5 \
+  -checkpoint_epoch 50 \
+  -pn_scale_obstacles 14.5 \
   -pn_threshold_obstacles 0.8 \
-  -pn_scale_food 12.0 \
-  -pn_threshold_food 0.85 \
+  -pn_scale_food 10.0 \
+  -pn_threshold_food 0.80 \
   -random_threshold_food 0.90 \
-  -starting_value 20.0 \
-  -energy_fraction 0.08 \
+  -starting_value 128.0 \
+  -energy_fraction 1.0 \
   -energy_decay 0.0005 \
-  -winners_fraction 0.3 \
-  -recombination_fraction 0.90 \
+  -winners_fraction 0.15 \
+  -recombination_fraction 0.95 \
   -mutation_probability 1.0 \
-  -mutation_range 0.05 \
-  -clean_window_size 5 \
-  -model_structure 162,243,162,81,10 \
+  -mutation_range 0.04 \
+  -clean_window_size 3 \
+  -model_structure 50,100,200,40,10 \
+  -load \
   -render \
-  -load 
 
   # -ep INT \
   # -st INT \

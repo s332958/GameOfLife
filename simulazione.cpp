@@ -10,14 +10,15 @@
 #include <GLFW/glfw3.h>
 
 #include <stdio.h>
+#include <time.h>
+#include <unistd.h>
 #include <cstring>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <cmath>
-#include <unistd.h> 
-#include <time.h>
 #include <iomanip>
 #include <string>
+#define FRAME_TIME_US 16666 
 
 void simulazione(
     Simulation_setup simulation_setup,
@@ -69,8 +70,8 @@ void simulazione(
     char path_save_file[300];
     sprintf(path_save_file,"models/%s",simulation_setup.file_model);
 
-    clock_t start;
-    clock_t end;
+    struct timespec start;
+    struct timespec end;
 
     unsigned long seed = (unsigned long)time(NULL);
 
@@ -238,8 +239,9 @@ void simulazione(
 
 
 
-        std::memset(world_value_h, 0, tot_world_dim_size_float);
-        std::memset(world_id_h, 0, tot_world_dim_size_int);
+        
+        //std::memset(world_value_h, 0, tot_world_dim_size_float);
+        //std::memset(world_id_h, 0, tot_world_dim_size_int);
         std::memset(alive_cells_h, 0, tot_world_dim_size_int);
 
         cudaMemset(world_signal_d, 0, tot_world_dim_size_float);    
@@ -248,8 +250,27 @@ void simulazione(
         CUDA_CHECK(cudaGetLastError());
         cudaMemset(occupation_vector_d, 0, tot_occupation_vector_size);
         CUDA_CHECK(cudaGetLastError());
+        cudaMemset(world_value_d, 0, tot_world_dim_size_float);
+        CUDA_CHECK(cudaGetLastError());
+        cudaMemset(world_id_d, 0, tot_world_dim_size_int);
+        CUDA_CHECK(cudaGetLastError());
 
         printf("RESET ALL MATRIX \n"); 
+
+                // - Aggiunta ostacoli perlin al mondo
+        launch_perlinNoise_obstacles(world_dim, world_id_d, PN_scale_obstacles, PN_threshold_obstacles, 0);
+        CUDA_CHECK(cudaGetLastError());
+        
+        // - Aggiunta cibo perlin al mondo
+        launch_perlinNoise_food(world_dim, world_id_d, world_value_d, PN_scale_food, PN_threshold_food, 0);
+        CUDA_CHECK(cudaGetLastError());
+
+        cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, 0);
+        CUDA_CHECK(cudaGetLastError());
+        cuda_memcpy( world_id_h, world_id_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, 0);
+        CUDA_CHECK(cudaGetLastError());
+
+        cudaDeviceSynchronize();
 
         // ======================================== Aggiunta creature al mondo 
 
@@ -258,7 +279,7 @@ void simulazione(
             while(world_id_h[random_index] != 0){
                 random_index = rand() % (world_dim*world_dim);
             }
-            if(world_id_h[random_index] == 0){
+            if(world_id_h[random_index] == 0 && world_value_h[random_index] == 0){
                 world_value_h[random_index] = starting_value;
                 world_id_h[random_index] = i + 1;
                 alive_cells_h[i] = random_index;                
@@ -280,13 +301,7 @@ void simulazione(
 
         
         
-        // - Aggiunta ostacoli perlin al mondo
-        launch_perlinNoise_obstacles(world_dim, world_id_d, PN_scale_obstacles, PN_threshold_obstacles, 0);
-        CUDA_CHECK(cudaGetLastError());
-        
-        // - Aggiunta cibo perlin al mondo
-        launch_perlinNoise_food(world_dim, world_id_d, world_value_d, PN_scale_food, PN_threshold_food, 0);
-        CUDA_CHECK(cudaGetLastError());
+
         
 
         // - Aggiunta cibo al mondo
@@ -302,8 +317,12 @@ void simulazione(
             // FASE 2 : calcolo step 
             // -------------------------------------------
         /*======================================================================================================================================*/
+        
+        printf(" alive_cell: %d" , *n_cell_alive_h );
+
         for(int step=0; step<N_STEPS && *n_cell_alive_h > 0; step++){
-            start = clock();
+            
+            clock_gettime(CLOCK_MONOTONIC, &start); 
             if(render){
                 if (glfwWindowShouldClose(window)) {
                     std::cout << "Finestra chiusa. Terminazione del programma." << std::endl;
@@ -491,10 +510,20 @@ void simulazione(
             launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature, 0);
             CUDA_CHECK(cudaGetLastError());
 
-            end = clock(); 
+            clock_gettime(CLOCK_MONOTONIC, &end); 
             char epocstep[64];
             snprintf(epocstep, sizeof(epocstep), "%d.%d", epoca,step);
-            printf("Step: %10s \t alive_cell: %8d  |  %3.1f it/s \n",epocstep,*n_cell_alive_h,1.0f/((float)(end - start) / CLOCKS_PER_SEC));
+                        
+            long elapsed_us = (end.tv_sec - start.tv_sec) * 1000000 +
+                            (end.tv_nsec - start.tv_nsec) / 1000;
+
+            //printf("Step: %10s \t alive_cell: %8d  |  %3.1f it/s \n",epocstep,*n_cell_alive_h,1.0f/((float)(end - start) / CLOCKS_PER_SEC));
+            /*
+            
+            if (elapsed_us < FRAME_TIME_US) {
+                usleep(FRAME_TIME_US - elapsed_us);
+            }
+                */
         }
 
         // -------------------------------------------
@@ -526,12 +555,13 @@ void simulazione(
         if (first_ID < 0 || first_ID >= n_creature) {
             std::cerr << "Errore: first_ID fuori range: " << first_ID << "\n";
         }
-        // ======================================== il primo vince sempre
-        cuda_memcpy(new_model_weights_d, model_weights_d + n_weight * first_ID, n_weight * sizeof(float), cudaMemcpyDeviceToDevice, cc_major, 0);
-        CUDA_CHECK(cudaGetLastError());        
-        cuda_memcpy(new_model_biases_d, model_biases_d + n_bias * first_ID, n_bias * sizeof(float), cudaMemcpyDeviceToDevice, cc_major, 0);
-        CUDA_CHECK(cudaGetLastError());      
-
+        // ======================================== il primo N sempre
+        for(int i = 0; i < limit_winner; i++){
+            cuda_memcpy(new_model_weights_d, model_weights_d + n_weight * creature_ordered_h[0], n_weight * sizeof(float), cudaMemcpyDeviceToDevice, cc_major, 0);
+            CUDA_CHECK(cudaGetLastError());        
+            cuda_memcpy(new_model_biases_d, model_biases_d + n_bias * creature_ordered_h[0], n_bias * sizeof(float), cudaMemcpyDeviceToDevice, cc_major, 0);
+            CUDA_CHECK(cudaGetLastError());      
+        }
         // ======================================== Creazione nuove creature 
         for(int i=1;i<limit_recombination;i++){
             int idx1 = get_random_int(0,limit_winner);

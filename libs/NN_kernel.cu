@@ -184,8 +184,8 @@ __global__ void output_elaboration_kernel(
 
     float center_value = world_value[center_index];
 
-    float final_output = center_value * energy_fraction * output;
     int dim_window_sq = dim_window*dim_window;
+    float final_output = center_value * energy_fraction / (dim_window_sq - 1) * output;
     int radius = dim_window / 2;
 
     int vision_window_index = output_index % dim_window_sq;

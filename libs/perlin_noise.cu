@@ -92,7 +92,7 @@ __global__ void perlinNoise_food_kernel(int world_dim, int* world_id_d, float* w
     val = (val + 1.0f) * 0.5f;
     if  (world_id_d[index] != 0 || val < threshold) return;
 
-    world_d[index] = 20;
+    world_d[index] = val * 200;
 }
 
 void launch_perlinNoise_obstacles(int world_dim, int* world_id_d, float scale, float threshold, cudaStream_t stream) {

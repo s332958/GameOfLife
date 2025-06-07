@@ -13,7 +13,10 @@ __constant__ float COLORI[100][3];
 void generateDistinctColors(float* colors, int n_creature) {
     for (int i = 0; i < n_creature; ++i) {
         // HSV -> RGB conversion per generare colori distinti
-        float h = (i * 360.0f / n_creature);
+        float angle = i * 360.0f / n_creature + 180.0f;
+
+        // subtract off however many full turns (360°) it contains
+        float h = angle - floorf(angle / 360.0f) * 360.0f;
         float s = 1.0f;
         float v = 1.0f;
 
@@ -97,7 +100,7 @@ __global__ void mappa_signal_kernel(float * mondo_value, int* id_matrix, float* 
         mondo_rgb[out_index] = mondo_value[pixel_index];  // gray scale for neutral cell
     }
     else{
-        mondo_rgb[out_index] = COLORI[ID - 1][channel] * (signal + 0.02) * 3;
+        mondo_rgb[out_index] = COLORI[ID - 1][channel] * signal;
     }
 
 }
