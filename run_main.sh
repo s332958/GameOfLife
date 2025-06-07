@@ -1,14 +1,13 @@
 #!/bin/bash
-nsys profile
-compute-sanitizer --tool memcheck --log-file sanitazer_report.txt  ./main.exe \
+./main.exe \
   -ep 100 \
-  -st 40 \
-  -scale 5 \
+  -st 1000 \
+  -scale 3 \
   -world_dim 100 \
   -n_creature 2 \
   -eval_method 0 \
   -reserve_memory 50 \
-  -checkpoint_epoch 50 \
+  -checkpoint_epoch 5 \
   -pn_scale_obstacles 14.5 \
   -pn_threshold_obstacles 0.8 \
   -pn_scale_food 10.0 \
@@ -22,7 +21,7 @@ compute-sanitizer --tool memcheck --log-file sanitazer_report.txt  ./main.exe \
   -mutation_probability 1.0 \
   -mutation_range 0.04 \
   -clean_window_size 3 \
-  -model_structure 50,100,10 \
+  -model_structure 18,10 \
   -render \
   -load
 
@@ -53,3 +52,6 @@ compute-sanitizer --tool memcheck --log-file sanitazer_report.txt  ./main.exe \
   # -render \
   # -watch_signaling
 
+
+# nsys profile ./main.exe \
+# compute-sanitizer --tool memcheck --log-file sanitazer_report.txt  ./main.exe \

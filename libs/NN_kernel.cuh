@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
 
 // function to compute the inut of NN
 void launch_vision(                 
@@ -57,6 +58,7 @@ void launch_compute_energy_and_occupation(
     float* energy_vector,
     int world_dim,
     int n_creature,
+    int n_steps,
     cudaStream_t stream
 );
 
@@ -71,4 +73,35 @@ void launch_recombine_models_kernel(
     float mutation_range,
     unsigned long seed,
     cudaStream_t stream
+);
+
+// Function for update the original model
+void launch_update_model(
+    float *weight_starting_model,
+    float *biases_starting_model,
+    float *varation_weights_vector,
+    float *varation_biases_vector,
+    float *score_vector,
+    int    n_weights,
+    int    n_biases,
+    int    n_creature,
+    float  alpha,
+    float  std,
+    cudaStream_t stream
+);
+
+// function for generating creature from the first
+void launch_generate_clone_creature(
+    float *weight_starting_model,
+    float *biases_starting_model,
+    float *weights_vector,
+    float *biases_vector,
+    float *varation_weights_vector,
+    float *varation_biases_vector,
+    int    n_weights,
+    int    n_biases,
+    int    n_creature,
+    float  std,
+    cudaStream_t stream,
+    curandState_t *states
 );

@@ -101,8 +101,10 @@ __global__ void NN_forward_weight_kernel(
        
         int world_index = cells[cell_index];
         int ID = world_id[world_index];
+
+        if(ID==0) printf("KERNEL FOREWARD WEIGHTS ID=%d \n",ID);
                 
-        int true_weight_index = n_weights * (ID - 1) + weight_index + offset_weights; // + offset pesi siccome dipendono dal layer (es layer0 offeset=0, layer1 offset=layer0*layer1)
+        int true_weight_index = n_weights * (ID - 1) + weight_index + offset_weights; 
          
         int input_neuron_idx  = weight_index % layer1_size;
         int output_neuron_idx = weight_index / layer1_size;
@@ -111,7 +113,7 @@ __global__ void NN_forward_weight_kernel(
         int output_index = cell_index * layer2_size  + output_neuron_idx;
             
         float weighted = weights[true_weight_index] * input[input_index];
-      
+
         atomicAdd(&output[output_index], weighted);
         
 }
@@ -141,7 +143,7 @@ __global__ void NN_forward_bias_kernel(
         int true_bias_index = n_biases * (ID - 1) + bias_index + offset_biases;
 
         output[tidx] += biases[true_bias_index];
-        // printf("thread: %4d, bias: %.4f totale_dopo: %4.4f \n",tidx,biases[bias_index],output_addr[tidx]);
+        if(ID==0) printf("KERNEL FOREWARD BIAS ID=%d \n",ID);
 
         // applico la relu ad ogni cella di output modificata 
         output[tidx] = fast_sigmoid(output[tidx]);
@@ -216,7 +218,9 @@ __global__ void compute_energy_and_occupation_kernel(
     float* occupation_vector,
     float* energy_vector,
     int world_dim,
-    int n_creature) {
+    int n_creature,
+    int n_steps
+) {
 
     int index = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -227,7 +231,7 @@ __global__ void compute_energy_and_occupation_kernel(
     if (id < 0)return;
     
     atomicAdd(&occupation_vector[id], 1.0f/float(world_dim));
-    atomicAdd(&energy_vector[id], world_value[index]);
+    atomicAdd(&energy_vector[id], world_value[index]/float(world_dim));
 
 }
 
@@ -471,6 +475,7 @@ void launch_compute_energy_and_occupation(
     float* energy_vector,
     int world_dim,
     int n_creature,
+    int n_steps,
     cudaStream_t stream
 ){
 
@@ -485,7 +490,9 @@ void launch_compute_energy_and_occupation(
         occupation_vector,
         energy_vector,
         world_dim,
-        n_creature);
+        n_creature,
+        n_steps
+    );
 
 
 }
@@ -526,6 +533,199 @@ void launch_recombine_models_kernel(
         mutation_prob,
         mutation_range,
         seed
+    );
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ===============================================================
+
+// ================================================================================================
+
+__global__ void generate_clone_creature_kernel(
+    float *weight_starting_model,
+    float *biases_starting_model,
+    float *weights_vector,
+    float *biases_vector,
+    float *varation_weights_vector,
+    float *varation_biases_vector,
+    int    n_weights,
+    int    n_biases,
+    int    n_creature,
+    float  std,
+    curandState_t *states
+){
+
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+    if(idx >= n_creature*n_weights) return;
+
+    curandState state = states[threadIdx.x];
+
+    float varation = (curand_uniform(&state) * 2) -1;
+    varation = varation * std; 
+
+    int id_creature = idx / n_weights;
+    int param_original_idx = idx % n_weights;
+    int final_pos = id_creature*n_weights + param_original_idx;
+
+    varation_weights_vector[final_pos] = varation;
+    weights_vector[final_pos] = weight_starting_model[param_original_idx] + varation;
+
+
+    if(idx >= n_creature*n_biases) return;
+
+    varation = (curand_uniform(&state) * 2) -1; 
+
+    id_creature = idx / n_biases;
+    param_original_idx = idx % n_biases;
+    final_pos = id_creature*n_biases + param_original_idx;
+
+    varation_biases_vector[final_pos] = varation;
+    biases_vector[final_pos] = biases_starting_model[param_original_idx] + varation;
+
+
+}
+
+
+void launch_generate_clone_creature(
+    float *weight_starting_model,
+    float *biases_starting_model,
+    float *weights_vector,
+    float *biases_vector,
+    float *varation_weights_vector,
+    float *varation_biases_vector,
+    int    n_weights,
+    int    n_biases,
+    int    n_creature,
+    float  std,
+    cudaStream_t stream,
+    curandState_t *states
+){
+
+    int n_thread = n_weights*n_creature;
+    if(n_thread>1024) n_thread = 1024;
+    int n_block = (n_weights + n_thread -1) / n_thread;
+
+    generate_clone_creature_kernel<<<n_block,n_thread,0,stream>>>(
+        weight_starting_model,
+        biases_starting_model,
+        weights_vector,
+        biases_vector,
+        varation_weights_vector,
+        varation_biases_vector,
+        n_weights,
+        n_biases,
+        n_creature,
+        std,
+        states
+    );
+
+}
+
+
+
+// ========================================================================================================
+
+
+__global__ void update_model_kernel(
+    float *weight_starting_model,
+    float *biases_starting_model,
+    float *varation_weights_vector,
+    float *varation_biases_vector,
+    float *score_vector,
+    int    n_weights,
+    int    n_biases,
+    int    n_creature,
+    float  alpha,
+    float  std
+){
+
+    __shared__ float shared_mem;
+
+    int creature_idx = threadIdx.x;
+    int params_idx = blockIdx.x;
+
+    if(creature_idx >= n_creature || params_idx >= n_biases+n_weights) return;
+
+    if(threadIdx.x==0){
+        shared_mem = 0;
+    }
+
+    __syncthreads();
+
+    if(blockIdx.x < n_weights){
+
+        int val = varation_weights_vector[params_idx] * score_vector[creature_idx];
+        atomicAdd(&shared_mem,val);
+
+        __syncthreads();
+
+        val = shared_mem;
+
+        val = (val * alpha) / (n_creature * std);
+        weight_starting_model[params_idx] += val;
+
+    }else{
+
+        params_idx -= n_weights;
+
+        int val = varation_biases_vector[params_idx] * score_vector[creature_idx];
+        atomicAdd(&shared_mem,val);
+
+        __syncthreads();
+
+        val = shared_mem;
+
+        val = (val * alpha) / (n_creature * std);
+        biases_starting_model[params_idx] += val;
+
+    }
+
+}
+
+
+void launch_update_model(
+    float *weight_starting_model,
+    float *biases_starting_model,
+    float *varation_weights_vector,
+    float *varation_biases_vector,
+    float *score_vector,
+    int    n_weights,
+    int    n_biases,
+    int    n_creature,
+    float  alpha,
+    float  std,
+    cudaStream_t stream
+){
+
+    int n_thread = n_creature;
+    if(n_thread>1024) n_thread = 1024;
+    int n_block = n_weights+n_biases;
+
+    update_model_kernel<<<n_block,n_thread,0,stream>>>(
+        weight_starting_model,
+        biases_starting_model,
+        varation_weights_vector,
+        varation_biases_vector,
+        score_vector,
+        n_weights,
+        n_biases,
+        n_creature,
+        alpha,
+        std
     );
 
 }

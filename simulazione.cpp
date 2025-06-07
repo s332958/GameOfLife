@@ -340,10 +340,10 @@ void simulazione(
         // FASE 2 : calcolo step 
         // -------------------------------------------
         /*======================================================================================================================================*/
-        
-        printf(" alive_cell: %d \n" , *n_cell_alive_h );
 
         for(int step=0; step<N_STEPS && *n_cell_alive_h > 0; step++){
+
+            // printf(" epoch: %d step: %d alive_cell: %d \n" , epoca, step, *n_cell_alive_h );
             
             clock_gettime(CLOCK_MONOTONIC, &start); 
             if(render){
@@ -426,7 +426,7 @@ void simulazione(
                 CUDA_CHECK(cudaGetLastError());
 
                 offset_workspace += limit_workspace_cell;
-                cudaDeviceSynchronize(); //fondamentale
+                cudaDeviceSynchronize(); 
 
 
             }
@@ -446,6 +446,7 @@ void simulazione(
             
             int new_n_cell = 0;
             compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell);
+            cudaDeviceSynchronize();        
             *n_cell_alive_h = new_n_cell;
 
             if(render){
@@ -477,7 +478,7 @@ void simulazione(
             
 
             // ======================================== Aggiornamento vettori valutazione occupazione ed energia
-            launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature, 0);
+            launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature, N_STEPS, 0);
             CUDA_CHECK(cudaGetLastError());
 
             clock_gettime(CLOCK_MONOTONIC, &end); 
