@@ -161,15 +161,15 @@ int main(int argc, char* argv[]) {
             n_weight += simulation_setup.model_structure[i] * simulation_setup.model_structure[i+1];
             n_bias += simulation_setup.model_structure[i + 1];
         }
-        size_t tot_models_weight_size = simulation_setup.n_creature * n_weight * sizeof(float);
-        size_t tot_models_bias_size = simulation_setup.n_creature * n_bias * sizeof(float);
+        size_t tot_model_weight_size = n_weight * sizeof(float);
+        size_t tot_model_bias_size =  n_bias * sizeof(float);
     
-        simulation_setup.weights_models = (float*) malloc(tot_models_weight_size);
-        simulation_setup.biases_models = (float*) malloc(tot_models_bias_size);
+        simulation_setup.weights_models = (float*) malloc(tot_model_weight_size);
+        simulation_setup.biases_models = (float*) malloc(tot_model_bias_size);
         
         char path_file[300];
         sprintf(path_file,"models/%s",simulation_setup.file_model);
-        bool load_done = load_model_from_file(path_file, simulation_setup.weights_models, simulation_setup.biases_models, n_weight, n_bias, simulation_setup.n_creature);
+        bool load_done = load_model_from_file(path_file, simulation_setup.weights_models, simulation_setup.biases_models, n_weight, n_bias);
         
         // if load of creature is not possible free the memory and set nullprt to weights and biases
         if(load_done==false){

@@ -4,7 +4,7 @@ compute-sanitizer --tool memcheck --log-file sanitazer_report.txt  ./main.exe \
   -ep 100 \
   -st 40 \
   -scale 5 \
-  -world_dim 256 \
+  -world_dim 100 \
   -n_creature 2 \
   -eval_method 0 \
   -reserve_memory 50 \
@@ -23,8 +23,8 @@ compute-sanitizer --tool memcheck --log-file sanitazer_report.txt  ./main.exe \
   -mutation_range 0.04 \
   -clean_window_size 3 \
   -model_structure 50,100,10 \
-  -load \
   -render \
+  -load
 
   # -ep INT \
   # -st INT \

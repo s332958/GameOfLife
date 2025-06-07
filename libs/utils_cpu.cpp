@@ -109,44 +109,27 @@ int get_random_int(int min, int max) {
 // Function to save models on file
 void save_model_on_file(
     const std::string& nome_file,
-    const int* dim,
-    int dim_size,
-    const float* pesi_totale,
-    const float* bias_totale,
+    const float* weights,
+    const float* biases,
     int dim_pesi,
-    int dim_bias,
-    int n_modelli)
+    int dim_bias
+)
 {
     std::ofstream out(nome_file);
     if (!out.is_open()) {
         throw std::runtime_error("Impossible open the file for writing.");
     }
 
-    for (int modello = 0; modello < n_modelli; ++modello) {
-        // Riga 1: vettore dim   
-        for (int i = 0; i < dim_size; ++i) {
-            out << dim[i];
-            if (i < dim_size - 1) out << " ";
-        }
-        out << "\n";
 
-        // Riga 2: pesi
-        const float* pesi_inizio = pesi_totale + modello * dim_pesi;
-        for (int i = 0; i < dim_pesi; ++i) {
-            out << pesi_inizio[i];
-            if (i < dim_pesi - 1) out << " ";
-        }
-        out << "\n";
+    for (int i = 0; i < dim_pesi; ++i) {
+        out << weights[i];
+        if (i < dim_pesi - 1) out << " ";
+    }
+    out << "\n";
 
-        // Riga 3: bias
-        const float* bias_inizio = bias_totale + modello * dim_bias;
-        for (int i = 0; i < dim_bias; ++i) {
-            out << bias_inizio[i];
-            if (i < dim_bias - 1) out << " ";
-        }
-        out << "\n";
-
-        out << "\n";out << "\n";out << "\n";
+    for (int i = 0; i < dim_bias; ++i) {
+        out << biases[i];
+        if (i < dim_bias - 1) out << " ";
     }
 
     out.close();
@@ -155,49 +138,37 @@ void save_model_on_file(
 // function for loading models from file
 int load_model_from_file(
     const std::string& nome_file,
-    float* pesi_totale,
-    float* bias_totale,
+    float* weights_host,
+    float* biases_host,
     int dim_pesi,
-    int dim_bias,
-    int n_modelli)
-{
+    int dim_bias
+) {
     std::ifstream in(nome_file);
     if (!in.is_open()) {
-        printf("Impossible open the file for reading");
+        std::cout << "Impossible open the file for reading: " << nome_file << std::endl;
         return 0;
     }
 
     std::string line;
-    int modello = 0;
-    int pesi_offset = 0;
-    int bias_offset = 0;
 
-    while (std::getline(in, line) && modello < n_modelli) {
-        // Riga 1: struttura modello (ignorata)
-        // Salta senza fare nulla
-
-        // Riga 2: pesi
-        std::getline(in, line);
-        std::istringstream pesi_stream(line);
-        for (int i = 0; i < dim_pesi; ++i) {
-            pesi_stream >> pesi_totale[pesi_offset + i];
+    // Riga 1: pesi
+    std::getline(in, line);
+    std::istringstream pesi_stream(line);
+    for (int i = 0; i < dim_pesi; ++i) {
+        if (!(pesi_stream >> weights_host[i])) {
+            std::cerr << "Error in reading weights (indice " << i << ")" << std::endl;
+            return 0;
         }
+    }
 
-        // Riga 3: bias
-        std::getline(in, line);
-        std::istringstream bias_stream(line);
-        for (int i = 0; i < dim_bias; ++i) {
-            bias_stream >> bias_totale[bias_offset + i];
+    // Riga 2: bias
+    std::getline(in, line);
+    std::istringstream bias_stream(line);
+    for (int i = 0; i < dim_bias; ++i) {
+        if (!(bias_stream >> biases_host[i])) {
+            std::cerr << "Error in reading biases (indice " << i << ")" << std::endl;
+            return 0;
         }
-
-        // Skip 3 righe vuote
-        std::getline(in, line);
-        std::getline(in, line);
-        std::getline(in, line);
-
-        modello++;
-        pesi_offset += dim_pesi;
-        bias_offset += dim_bias;
     }
 
     in.close();
