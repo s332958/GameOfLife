@@ -131,7 +131,6 @@ void simulazione(
     int   *world_id_h          = (int*)   malloc(tot_world_dim_size_int);
     float *energy_vector_h     = (float*) malloc(tot_energy_vector_size);
     float *occupation_vector_h = (float*) malloc(tot_occupation_vector_size);
-    int   *creature_ordered_h  = (int*)   malloc(tot_occupation_vector_size);
     int   *alive_cells_h       = (int*)   malloc(tot_world_dim_size_int);
     int   *n_cell_alive_h      ; 
     float *model_weights_h     = nullptr;
@@ -342,7 +341,7 @@ void simulazione(
         // -------------------------------------------
         /*======================================================================================================================================*/
         
-        printf(" alive_cell: %d" , *n_cell_alive_h );
+        printf(" alive_cell: %d \n" , *n_cell_alive_h );
 
         for(int step=0; step<N_STEPS && *n_cell_alive_h > 0; step++){
             
@@ -515,7 +514,20 @@ void simulazione(
         // ======================================== Salvataggio nuovo modelli
         if((epoca != 0 && epoca%checkpoint_epoch == 0) || epoca == (N_EPOCH - 1)){    
             cuda_memcpy(model_weights_h,model_weights_d,tot_weights_size,cudaMemcpyDeviceToHost,cc_major,0);        
-            cuda_memcpy(model_biases_h,model_biases_d,tot_biases_size,cudaMemcpyDeviceToHost,cc_major,0);        
+            cuda_memcpy(model_biases_h,model_biases_d,tot_biases_size,cudaMemcpyDeviceToHost,cc_major,0); 
+
+            if(METHOD_EVAL==0) cuda_memcpy(occupation_vector_h,occupation_vector_d,tot_occupation_vector_size,cudaMemcpyDeviceToHost,cc_major,0);    
+            else cuda_memcpy(energy_vector_h,energy_vector_d,tot_energy_vector_size,cudaMemcpyDeviceToHost,cc_major,0); 
+
+            float tot_energy = 0, tot_occupation = 0;
+            for(int i=0; i<n_creature; i++){
+                if(METHOD_EVAL==0) tot_occupation += occupation_vector_h[i];
+                else tot_energy += energy_vector_h[i];
+            }
+
+            if(METHOD_EVAL==0) append_score_to_file("Occupations_points.txt",tot_occupation);
+            else append_score_to_file("Energy_points",tot_energy); 
+
             save_model_on_file(path_save_file,model_weights_h,model_biases_h,n_weight,n_bias);
         }       
 
@@ -552,7 +564,6 @@ void simulazione(
 
     free(energy_vector_h);
     free(occupation_vector_h);
-    free(creature_ordered_h);
     free(model_weights_h);
     free(model_biases_h);
 
