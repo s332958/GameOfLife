@@ -673,7 +673,7 @@ __global__ void update_model_kernel(
 
         val = shared_mem;
 
-        val = (val * alpha) / (n_creature * std);
+        val = (val * alpha) / (n_creature * std * n_steps);
         weight_starting_model[params_idx] += val;
 
     }else{
