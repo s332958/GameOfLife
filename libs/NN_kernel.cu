@@ -672,7 +672,7 @@ __global__ void update_model_kernel(
         __syncthreads();
 
         // cumulate contribution for each creature
-        float val = (varation_weights_vector[params_idx]-weight_starting_model[params_idx]) * score_vector[creature_idx] / shared_mem[1];
+        float val = varation_weights_vector[params_idx] * score_vector[creature_idx] / shared_mem[1];
         atomicAdd(&shared_mem[0],val);
 
         __syncthreads();
@@ -689,7 +689,7 @@ __global__ void update_model_kernel(
         atomicAdd(&shared_mem[1],score_vector[creature_idx]);
         __syncthreads();
 
-        float val = (varation_biases_vector[params_idx]-biases_starting_model[params_idx]) * score_vector[creature_idx] / shared_mem[1];
+        float val = varation_biases_vector[params_idx] * score_vector[creature_idx] / shared_mem[1];
         atomicAdd(&shared_mem[0],val);
 
         __syncthreads();

@@ -220,9 +220,9 @@ void simulazione(
     if(biases_models==nullptr && weights_models==nullptr){       
         
         // Generation random models
-        launch_fill_random_kernel(model_weights_d,0,n_weight,-std,std,seed,0);
+        launch_fill_random_kernel(model_weights_d,0,n_weight,0,0,seed,0);
         CUDA_CHECK(cudaGetLastError());
-        launch_fill_random_kernel(model_biases_d,0,n_bias,-std,std,seed+1,0);
+        launch_fill_random_kernel(model_biases_d,0,n_bias,0,0,seed+1,0);
         CUDA_CHECK(cudaGetLastError());
         
         // Load on CPU vettore pesi del modello 
