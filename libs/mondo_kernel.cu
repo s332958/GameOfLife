@@ -465,7 +465,6 @@ __global__ void alive_cells_builder_kernel(int* mondo_id, int* alive_cells_d, in
 }
 
 void compact_with_thrust(int* mondo_id, int* alive_cells_d, int dim_world, int &new_size) {
-    cudaMemset(alive_cells_d, 0, dim_world * dim_world * sizeof(float));
 
     int n_thread_per_block = 1024; 
     int thread_number = dim_world*dim_world;

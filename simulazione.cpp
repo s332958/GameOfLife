@@ -70,8 +70,8 @@ void simulazione(
     char path_save_file[300];
     sprintf(path_save_file,"models/%s",simulation_setup.file_model);
 
-    struct timespec start;
-    struct timespec end;
+    clock_t start;
+    clock_t end;
 
     unsigned long seed = (unsigned long)time(NULL);
 
@@ -287,15 +287,13 @@ void simulazione(
 
         int random_index = rand() % world_dim*world_dim;
         for (int i = 0; i < n_creature; i++){
-            while(world_id_h[random_index] != 0){
+            while(world_id_h[random_index] != 0 || world_value_h[random_index] != 0){
                 random_index = rand() % (world_dim*world_dim);
             }
-            if(world_id_h[random_index] == 0 && world_value_h[random_index] == 0){
-                world_value_h[random_index] = starting_value;
-                world_id_h[random_index] = i + 1;
-                alive_cells_h[i] = random_index;                
-                random_index = rand() % (world_dim*world_dim);
-            }     
+            world_value_h[random_index] = starting_value;
+            world_id_h[random_index] = i + 1;
+            alive_cells_h[i] = random_index;                
+            random_index = rand() % (world_dim*world_dim); 
         }
 
         *n_cell_alive_h = n_creature;
@@ -312,11 +310,14 @@ void simulazione(
 
         // - Aggiunta cibo al mondo
         // - Possibile ottimizzazione togliendo i curandstate
+        
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 1.0f, 10.0f, random_threshold_food, 0);
         CUDA_CHECK(cudaGetLastError());
-
+        
+        
         launch_clean_around_cells(world_value_d, world_id_d, world_dim, alive_cells_d, n_cell_alive_h, clean_window_size, 0);
         CUDA_CHECK(cudaGetLastError());
+        
 
 
         // - Generazione nuove creature per la simulazione
@@ -345,13 +346,18 @@ void simulazione(
 
             // printf(" epoch: %d step: %d alive_cell: %d \n" , epoca, step, *n_cell_alive_h );
             
-            clock_gettime(CLOCK_MONOTONIC, &start); 
+            start = clock();
             if(render){
                 if (glfwWindowShouldClose(window)) {
                     std::cout << "Finestra chiusa. Terminazione del programma." << std::endl;
                     goto fine;
                 }
-            }            
+            }         
+            
+            int new_n_cell = 0;
+            compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell);
+            cudaDeviceSynchronize();        
+            *n_cell_alive_h = new_n_cell;
 
 
             int offset=0;
@@ -444,10 +450,6 @@ void simulazione(
             
             cudaDeviceSynchronize();        
             
-            int new_n_cell = 0;
-            compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell);
-            cudaDeviceSynchronize();        
-            *n_cell_alive_h = new_n_cell;
 
             if(render){
 
@@ -481,13 +483,10 @@ void simulazione(
             launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature, 0);
             CUDA_CHECK(cudaGetLastError());
 
-            clock_gettime(CLOCK_MONOTONIC, &end); 
+            end = clock(); 
             char epocstep[64];
             snprintf(epocstep, sizeof(epocstep), "%d.%d", epoca,step);
-                        
-            long elapsed_us = (end.tv_sec - start.tv_sec) * 1000000 +
-                            (end.tv_nsec - start.tv_nsec) / 1000;
-
+            printf("Step: %10s \t alive_cell: %8d  |  %3.1f it/s \n",epocstep,*n_cell_alive_h,1.0f/((float)(end - start) / CLOCKS_PER_SEC));
         }
 
         // -------------------------------------------

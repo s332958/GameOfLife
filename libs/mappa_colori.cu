@@ -6,7 +6,7 @@
 #include <cmath>
 
 // Declare constant memory for save color matrix using for map the color during the rendering
-__constant__ float COLORI[100][3];
+__constant__ float COLORI[300][3];
 
 
 // declere color in host 
@@ -46,7 +46,7 @@ void load_constant_memory_GPU(int n_creature) {
     generateDistinctColors(color_h, n_creature);
 
 
-    cudaMemcpyToSymbol(COLORI, color_h, sizeof(float) * 100 * 3);
+    cudaMemcpyToSymbol(COLORI, color_h, sizeof(float) * 300 * 3);
     free(color_h);
 }
 
