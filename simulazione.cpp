@@ -314,9 +314,10 @@ void simulazione(
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 1.0f, 10.0f, random_threshold_food, 0);
         CUDA_CHECK(cudaGetLastError());
         
-        
+        /*
         launch_clean_around_cells(world_value_d, world_id_d, world_dim, alive_cells_d, n_cell_alive_h, clean_window_size, 0);
         CUDA_CHECK(cudaGetLastError());
+        */
         
 
 
@@ -353,11 +354,6 @@ void simulazione(
                     goto fine;
                 }
             }         
-            
-            int new_n_cell = 0;
-            compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell);
-            cudaDeviceSynchronize();        
-            *n_cell_alive_h = new_n_cell;
 
 
             int offset=0;
@@ -432,7 +428,7 @@ void simulazione(
                 CUDA_CHECK(cudaGetLastError());
 
                 offset_workspace += limit_workspace_cell;
-                cudaDeviceSynchronize(); 
+                //cudaDeviceSynchronize(); 
 
 
             }
@@ -447,9 +443,25 @@ void simulazione(
                 energy_decay,
                 0
             ); 
-            
-            cudaDeviceSynchronize();        
-            
+
+
+            /*
+
+            launch_find_index_cell_alive(
+                world_id_d,
+                world_dim * world_dim,
+                alive_cells_d,
+                n_cell_alive_d,
+                n_cell_alive_h,
+                support_vector_d,
+                0
+            );
+            */                     
+
+            int new_n_cell = 0;
+            compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell, 0);
+            //cudaDeviceSynchronize();        
+            *n_cell_alive_h = new_n_cell;
 
             if(render){
 
@@ -530,7 +542,8 @@ void simulazione(
             else append_score_to_file("points/Energy_points.txt",tot_energy/N_STEPS); 
 
             save_model_on_file(path_save_file,model_weights_h,model_biases_h,n_weight,n_bias);
-        }       
+        }     
+      
 
     }
 

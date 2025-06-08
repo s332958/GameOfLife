@@ -101,8 +101,6 @@ __global__ void NN_forward_weight_kernel(
        
         int world_index = cells[cell_index];
         int ID = world_id[world_index];
-
-        if(ID==0) printf("KERNEL FOREWARD WEIGHTS ID=%d \n",ID);
                 
         int true_weight_index = n_weights * (ID - 1) + weight_index + offset_weights; 
          
@@ -143,7 +141,6 @@ __global__ void NN_forward_bias_kernel(
         int true_bias_index = n_biases * (ID - 1) + bias_index + offset_biases;
 
         output[tidx] += biases[true_bias_index];
-        if(ID==0) printf("KERNEL FOREWARD BIAS ID=%d \n",ID);
 
         // applico la relu ad ogni cella di output modificata 
         output[tidx] = fast_sigmoid(output[tidx]);
@@ -411,9 +408,9 @@ void launch_NN_forward(
             biases_offset
         ); 
         //if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori NN_forward_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
-        cudaMemcpy(input_workspace, output_workspace, workspace_size*limit_workspace_cell, cudaMemcpyDeviceToDevice);
         
         if (i < (dim_structure-2)){
+            cudaMemcpy(input_workspace, output_workspace, workspace_size*limit_workspace_cell, cudaMemcpyDeviceToDevice);
             cudaMemset(output_workspace, 0, workspace_size*limit_workspace_cell);
         }
         weight_offset += layer1_size*layer2_size;

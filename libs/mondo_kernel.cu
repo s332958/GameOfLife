@@ -105,10 +105,6 @@ __global__ void world_update_kernel(
                 } 
             }   
         } 
-
-
-
-
         if(ID > 0){
             float energy = starting_value + ally_energy - enemy_energy - energy_decay;
             
@@ -158,7 +154,7 @@ __global__ void world_update_kernel(
                     }
                 }
             } 
-            atomicAdd(&world_value[index], -tot_energy);
+            atomicAdd(&world_value[index], - tot_energy);
             id_matrix[index] = 0;   
 
         }else{
@@ -464,13 +460,13 @@ __global__ void alive_cells_builder_kernel(int* mondo_id, int* alive_cells_d, in
 
 }
 
-void compact_with_thrust(int* mondo_id, int* alive_cells_d, int dim_world, int &new_size) {
+void compact_with_thrust(int* mondo_id, int* alive_cells_d, int dim_world, int &new_size, cudaStream_t stream) {
 
     int n_thread_per_block = 1024; 
     int thread_number = dim_world*dim_world;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
-    alive_cells_builder_kernel<<<n_block,n_thread_per_block,0>>>(
+    alive_cells_builder_kernel<<<n_block,n_thread_per_block,0,stream>>>(
         mondo_id,
         alive_cells_d,
         thread_number
