@@ -226,8 +226,8 @@ __global__ void compute_energy_and_occupation_kernel(
 
     if (id < 0)return;
     
-    atomicAdd(&occupation_vector[id], 1.0f/float(world_dim));
-    atomicAdd(&energy_vector[id], world_value[index]/float(world_dim));
+    atomicAdd(&occupation_vector[id], 1.0f);
+    atomicAdd(&energy_vector[id], world_value[index]);
 
 }
 

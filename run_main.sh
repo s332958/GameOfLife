@@ -3,16 +3,16 @@
   -ep 100 \
   -st 1000 \
   -scale 3 \
-  -world_dim 100 \
-  -n_creature 2 \
-  -eval_method 0 \
+  -world_dim 500 \
+  -n_creature 5 \
+  -eval_method 1 \
   -reserve_memory 50 \
   -checkpoint_epoch 1 \
   -pn_scale_obstacles 14.5 \
   -pn_threshold_obstacles 0.8 \
   -pn_scale_food 10.0 \
-  -pn_threshold_food 0.80 \
-  -random_threshold_food 0.90 \
+  -pn_threshold_food 0.90 \
+  -random_threshold_food 0.99 \
   -starting_value 128.0 \
   -energy_fraction 1.0 \
   -energy_decay 0.0005 \
@@ -21,9 +21,9 @@
   -mutation_probability 1.0 \
   -mutation_range 0.04 \
   -clean_window_size 3 \
-  -model_structure 18,10 \
+  -model_structure 162,10 \
   -std 2 \
-  -alpha 0.01 \
+  -alpha 0.0001 \
   -render \
   -load
 
