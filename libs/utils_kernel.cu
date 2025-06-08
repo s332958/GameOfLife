@@ -125,7 +125,7 @@ template void launch_reset_kernel<int>(int*, int, cudaStream_t);
 
 __global__ void init_curandstates_kernel(curandState* states, unsigned long seed) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    curand_init(seed, idx, 0, &states[idx]);
+    curand_init(seed, idx, threadIdx.x - blockIdx.x, &states[idx]);
 }
 
 void launch_init_curandstates(curandState d_states[], int total_threads, unsigned long seed, cudaStream_t stream) {

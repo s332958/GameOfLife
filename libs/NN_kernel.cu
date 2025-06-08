@@ -570,6 +570,7 @@ __global__ void generate_clone_creature_kernel(
 
     float varation = (curand_uniform(&state) * 2) -1;
     varation = varation * std; 
+    // printf("thread %d: %f \n",idx,varation);
 
     int id_creature = idx / n_weights;
     int param_original_idx = idx % n_weights;
@@ -648,7 +649,9 @@ __global__ void update_model_kernel(
     int n_steps
 ){
 
-    __shared__ float shared_mem;
+    // 0 -> take the contribution of each creature
+    // 1 -> take total points of each creature for normalizations
+    __shared__ float shared_mem[2];
 
     int creature_idx = threadIdx.x;
     int params_idx = blockIdx.x;
@@ -656,35 +659,47 @@ __global__ void update_model_kernel(
     if(creature_idx >= n_creature || params_idx >= n_biases+n_weights) return;
 
     if(threadIdx.x==0){
-        shared_mem = 0;
+        shared_mem[0] = 0;
+        shared_mem[1] = 0;
     }
 
     __syncthreads();
 
     if(blockIdx.x < n_weights){
 
-        int val = varation_weights_vector[params_idx] * score_vector[creature_idx];
-        atomicAdd(&shared_mem,val);
+        // cumulate points for each creature
+        atomicAdd(&shared_mem[1],score_vector[creature_idx]);
+        __syncthreads();
+
+        // cumulate contribution for each creature
+        float val = (varation_weights_vector[params_idx]-weight_starting_model[params_idx]) * score_vector[creature_idx] / shared_mem[1];
+        atomicAdd(&shared_mem[0],val);
 
         __syncthreads();
 
-        val = shared_mem;
+        val = shared_mem[0];
 
-        val = (val * alpha) / (n_creature * std * n_steps);
+        val = (val * alpha) / (n_creature * std);
         weight_starting_model[params_idx] += val;
 
     }else{
 
         params_idx -= n_weights;
 
-        int val = varation_biases_vector[params_idx] * score_vector[creature_idx];
-        atomicAdd(&shared_mem,val);
+        atomicAdd(&shared_mem[1],score_vector[creature_idx]);
+        __syncthreads();
+
+        float val = (varation_biases_vector[params_idx]-biases_starting_model[params_idx]) * score_vector[creature_idx] / shared_mem[1];
+        atomicAdd(&shared_mem[0],val);
 
         __syncthreads();
 
-        val = shared_mem;
+        val = shared_mem[0];
 
-        val = (val * alpha) / (n_creature * std * n_steps);
+        val = (val * alpha) / (n_creature * std);
+
+        //printf("VAL: %f varation: %f, score: %f, tot_score: %f \n",val,varation_biases_vector[params_idx],score_vector[creature_idx],shared_mem[1]);
+
         biases_starting_model[params_idx] += val;
 
     }

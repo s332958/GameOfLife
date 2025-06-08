@@ -1,8 +1,8 @@
 #!/bin/bash
 ./main.exe \
   -ep 100 \
-  -st 1000 \
-  -scale 3 \
+  -st 5000 \
+  -scale 1 \
   -world_dim 500 \
   -n_creature 5 \
   -eval_method 1 \
@@ -15,18 +15,19 @@
   -random_threshold_food 0.99 \
   -starting_value 128.0 \
   -energy_fraction 1.0 \
-  -energy_decay 0.0005 \
+  -energy_decay 0.005 \
   -winners_fraction 0.15 \
   -recombination_fraction 0.95 \
   -mutation_probability 1.0 \
   -mutation_range 0.04 \
   -clean_window_size 3 \
-  -model_structure 162,10 \
-  -std 2 \
-  -alpha 0.0001 \
-  -render \
-  -load
+  -model_structure 50,10 \
+  -std 6 \
+  -alpha 1 \
+  -load \
+  -render
 
+  # -render \
   # -ep INT \
   # -st INT \
   # -scale INT \
