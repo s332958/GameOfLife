@@ -220,9 +220,9 @@ void simulazione(
     if(biases_models==nullptr && weights_models==nullptr){       
         
         // Generation random models
-        launch_fill_random_kernel(model_weights_d,0,n_weight,0,0,seed,0);
+        launch_fill_random_kernel(model_weights_d,0,n_weight,0,0,curandStates,0);
         CUDA_CHECK(cudaGetLastError());
-        launch_fill_random_kernel(model_biases_d,0,n_bias,0,0,seed+1,0);
+        launch_fill_random_kernel(model_biases_d,0,n_bias,0,0,curandStates,0);
         CUDA_CHECK(cudaGetLastError());
         
         // Load on CPU vettore pesi del modello 
@@ -318,8 +318,6 @@ void simulazione(
         launch_clean_around_cells(world_value_d, world_id_d, world_dim, alive_cells_d, n_cell_alive_h, clean_window_size, 0);
         CUDA_CHECK(cudaGetLastError());
         */
-        
-
 
         // - Generazione nuove creature per la simulazione
         launch_generate_clone_creature(
@@ -332,6 +330,7 @@ void simulazione(
             n_weight,
             n_bias,
             n_creature,
+            winners_fraction*n_creature,
             std,
             0,
             curandStates

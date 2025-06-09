@@ -9,15 +9,14 @@
 // ============================================================================
 
 // funtion for generating random number in a vector in GPU
-__global__ void fill_random_kernel(float* d_vec, int start, int finish, float minVal, float maxVal, unsigned long seed) {
+__global__ void fill_random_kernel(float* d_vec, int start, int finish, float minVal, float maxVal, curandState states[]) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= finish - start) return;
 
     int real_idx = idx + start;
 
     // Setup generator per thread
-    curandState state;
-    curand_init(seed, idx, 0, &state);
+    curandState state = states[threadIdx.x];
 
     float rand_uniform = curand_uniform(&state); // [0,1)
 
@@ -28,13 +27,14 @@ __global__ void fill_random_kernel(float* d_vec, int start, int finish, float mi
 
 // Wrapper: fill vettore random con calcolo griglia/thread
 void launch_fill_random_kernel(float* d_vec, int start, int finish, float minVal, float maxVal,
-                                unsigned long seed, cudaStream_t stream) {
+                                curandState states[],
+                                cudaStream_t stream) {
 
     int threads = 1024;
     int n = finish - start;
     int blocks = (n + threads - 1) / threads;
 
-    fill_random_kernel<<<blocks, threads, 0, stream>>>(d_vec, start, finish, minVal, maxVal, seed);
+    fill_random_kernel<<<blocks, threads, 0, stream>>>(d_vec, start, finish, minVal, maxVal, states);
 
 }
 template <typename T>

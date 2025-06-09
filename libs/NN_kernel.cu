@@ -558,6 +558,7 @@ __global__ void generate_clone_creature_kernel(
     int    n_weights,
     int    n_biases,
     int    n_creature,
+    int    limit_creature,
     float  std,
     curandState_t *states
 ){
@@ -570,26 +571,38 @@ __global__ void generate_clone_creature_kernel(
 
     float varation = (curand_uniform(&state) * 2) -1;
     varation = varation * std; 
-    // printf("thread %d: %f \n",idx,varation);
 
     int id_creature = idx / n_weights;
     int param_original_idx = idx % n_weights;
     int final_pos = id_creature*n_weights + param_original_idx;
 
-    varation_weights_vector[final_pos] = varation;
-    weights_vector[final_pos] = weight_starting_model[param_original_idx] + varation;
+    // the limit creature impose how many creature depends from original, model, the rest are regenate random.
+    if(id_creature<limit_creature){
+        varation_weights_vector[final_pos] = varation;
+        weights_vector[final_pos] = weight_starting_model[param_original_idx] + varation;
+    }else{
+        varation_weights_vector[final_pos] = varation - weight_starting_model[param_original_idx];
+        weights_vector[final_pos] = varation;
+    }
 
 
     if(idx >= n_creature*n_biases) return;
 
     varation = (curand_uniform(&state) * 2) -1; 
+    varation = varation * std; 
 
     id_creature = idx / n_biases;
     param_original_idx = idx % n_biases;
     final_pos = id_creature*n_biases + param_original_idx;
 
-    varation_biases_vector[final_pos] = varation;
-    biases_vector[final_pos] = biases_starting_model[param_original_idx] + varation;
+    // the limit creature impose how many creature depends from original, model, the rest are regenate random.
+    if(id_creature<limit_creature){
+        varation_biases_vector[final_pos] = varation;
+        biases_vector[final_pos] = biases_starting_model[param_original_idx] + varation;
+    }else{
+        varation_biases_vector[final_pos] = varation - biases_starting_model[param_original_idx];
+        biases_vector[final_pos] = varation;
+    }
 
 
 }
@@ -605,6 +618,7 @@ void launch_generate_clone_creature(
     int    n_weights,
     int    n_biases,
     int    n_creature,
+    int    limit_creature,
     float  std,
     cudaStream_t stream,
     curandState_t *states
@@ -624,6 +638,7 @@ void launch_generate_clone_creature(
         n_weights,
         n_biases,
         n_creature,
+        limit_creature,
         std,
         states
     );

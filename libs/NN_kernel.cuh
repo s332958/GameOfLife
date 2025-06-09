@@ -101,6 +101,7 @@ void launch_generate_clone_creature(
     int    n_weights,
     int    n_biases,
     int    n_creature,
+    int    limit_creature,
     float  std,
     cudaStream_t stream,
     curandState_t *states
