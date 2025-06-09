@@ -153,16 +153,16 @@ void simulazione(
     float *world_signal_d             = (float*) cuda_allocate(tot_world_dim_size_float, cc_major, 0);
     int   *world_id_d                 = (int*)   cuda_allocate(tot_world_dim_size_int, cc_major, 0);    
     float *world_contributions_d      = (float*) cuda_allocate(tot_matrix_contribution_size, cc_major, 0);
-    float *model_weights_d            = (float*) cuda_allocate(tot_weights_size, cc_major, 0);
-    float *model_biases_d             = (float*) cuda_allocate(tot_biases_size, cc_major, 0);
     int   *alive_cells_d              = (int*)   cuda_allocate(tot_world_dim_size_int, cc_major, 0);
     float *energy_vector_d            = (float*) cuda_allocate(tot_energy_vector_size, cc_major, 0);
     float *occupation_vector_d        = (float*) cuda_allocate(tot_occupation_vector_size, cc_major, 0);
-    float *varation_model_weights_d   = (float*) cuda_allocate(tot_models_weight_size, cc_major, 0);
-    float *varation_model_biases_d    = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);    
+    float *model_weights_d            = (float*) cuda_allocate(tot_weights_size, cc_major, 0);
+    float *model_biases_d             = (float*) cuda_allocate(tot_biases_size, cc_major, 0);
+    float *variation_model_weights_d  = (float*) cuda_allocate(tot_models_weight_size, cc_major, 0);
+    float *variation_model_biases_d   = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);    
     float *new_models_weights_d       = (float*) cuda_allocate(tot_models_weight_size, cc_major, 0);
     float *new_models_biases_d        = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);
-    int   *support_vector_d           = (int*)   cuda_allocate(tot_world_dim_size_int, cc_major, 0);
+    // int   *support_vector_d           = (int*)   cuda_allocate(tot_world_dim_size_int, cc_major, 0);
     curandState *curandStates         = nullptr;
     int   *n_cell_alive_d             ; 
     
@@ -327,8 +327,8 @@ void simulazione(
             model_biases_d,
             new_models_weights_d,
             new_models_biases_d,
-            varation_model_weights_d,
-            varation_model_biases_d,
+            variation_model_weights_d,
+            variation_model_biases_d,
             n_weight,
             n_bias,
             n_creature,
@@ -442,21 +442,7 @@ void simulazione(
                 n_creature,
                 energy_decay,
                 0
-            ); 
-
-
-            /*
-
-            launch_find_index_cell_alive(
-                world_id_d,
-                world_dim * world_dim,
-                alive_cells_d,
-                n_cell_alive_d,
-                n_cell_alive_h,
-                support_vector_d,
-                0
-            );
-            */                     
+            );                    
 
             int new_n_cell = 0;
             compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell, 0);
@@ -506,14 +492,14 @@ void simulazione(
         // -------------------------------------------
 
         float *chosen_points = nullptr;
-        if(METHOD_EVAL==0) chosen_points=energy_vector_d;
+        if(METHOD_EVAL==1) chosen_points=energy_vector_d;
         else chosen_points=occupation_vector_d;
 
         launch_update_model(
             model_weights_d,
             model_biases_d,
-            varation_model_weights_d,
-            varation_model_biases_d,
+            variation_model_weights_d,
+            variation_model_biases_d,
             chosen_points,
             n_weight,
             n_bias,
@@ -570,8 +556,8 @@ void simulazione(
     cuda_Free(energy_vector_d, cc_major, 0);
     cuda_Free(model_biases_d, cc_major, 0);
     cuda_Free(model_weights_d, cc_major, 0);
-    cuda_Free(varation_model_weights_d, cc_major, 0);
-    cuda_Free(varation_model_biases_d, cc_major, 0);
+    cuda_Free(variation_model_weights_d, cc_major, 0);
+    cuda_Free(variation_model_biases_d, cc_major, 0);
     cuda_Free(new_models_weights_d, cc_major, 0);
     cuda_Free(new_models_biases_d, cc_major, 0);
     cuda_Free(workspace_input_d, cc_major, 0);
