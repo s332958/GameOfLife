@@ -31,11 +31,7 @@ struct Simulation_setup {
     float starting_value;
     float energy_fraction;
     float energy_decay;
-    float winners_fraction;
-    float recombination_newborns_fraction;
-    float gen_x_block;
-    float mutation_probability;
-    float mutation_range;
+    float clone_fraction;
     int clean_window_size;
     char file_model[200];
     bool watch_signaling;
@@ -63,11 +59,7 @@ struct Simulation_setup {
         float starting_value = 9.0f,
         float energy_fraction = (1.0f / 9.0f) / 2.0f,
         float energy_decay = 0.001f,
-        float winners_fraction = 0.45f,
-        float recombination_newborns_fraction = 0.75f,
-        float gen_x_block = 0.005f,
-        float mutation_probability = 0.02f,
-        float mutation_range = 0.4f,
+        float clone_fraction = 0.5f,
         int clean_window_size = 11,
         bool load = false,
         int scale = 1,
@@ -96,11 +88,7 @@ struct Simulation_setup {
           starting_value(starting_value),
           energy_fraction(energy_fraction),
           energy_decay(energy_decay),
-          winners_fraction(winners_fraction),
-          recombination_newborns_fraction(recombination_newborns_fraction),
-          gen_x_block(gen_x_block),
-          mutation_probability(mutation_probability),
-          mutation_range(mutation_range),
+          clone_fraction(clone_fraction),
           clean_window_size(clean_window_size),
           load(load),
           scale(scale),

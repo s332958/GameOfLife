@@ -65,14 +65,8 @@ void parse_args(int argc, char** argv, Simulation_setup& setup) {
             setup.energy_fraction = std::stof(argv[++i]);
         } else if (arg == "-energy_decay" && i + 1 < argc) {
             setup.energy_decay = std::stof(argv[++i]);
-        } else if (arg == "-winners_fraction" && i + 1 < argc) {
-            setup.winners_fraction = std::stof(argv[++i]);
-        } else if (arg == "-recombination_fraction" && i + 1 < argc) {
-            setup.recombination_newborns_fraction = std::stof(argv[++i]);
-        } else if (arg == "-mutation_probability" && i + 1 < argc) {
-            setup.mutation_probability = std::stof(argv[++i]);
-        } else if (arg == "-mutation_range" && i + 1 < argc) {
-            setup.mutation_range = std::stof(argv[++i]);
+        } else if (arg == "-clone_fraction" && i + 1 < argc) {
+            setup.clone_fraction = std::stof(argv[++i]);
         } else if (arg == "-clean_window_size" && i + 1 < argc) {
             setup.clean_window_size = std::stoi(argv[++i]);
         } else if (arg == "-watch_signaling") {
@@ -96,9 +90,9 @@ void parse_args(int argc, char** argv, Simulation_setup& setup) {
                 else offset += sprintf(setup.file_model + offset, "%d.txt", setup.model_structure[i]);
             }
             printf("Model file: %s \n",setup.file_model);
-        }else if ( arg == "-alpha" && i + 1 < argc){
+        }else if ( arg == "-learning_rate" && i + 1 < argc){
             setup.alpha = std::stof(argv[++i]);
-        }else if (arg == "-std" && i + 1 < argc){
+        }else if (arg == "-mutation_range" && i + 1 < argc){
             setup.std = std::stof(argv[++i]);
         }
     }

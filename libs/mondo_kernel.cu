@@ -14,7 +14,8 @@
 
 // kernel for adding object to world (like obstacles or food)
 __global__ void add_objects_to_world_kernel(float *world_value, int *world_id, int dim_world, 
-                                    int id, float min_value, float max_value, float threashold
+                                    int id, float min_value, float max_value, float threashold,
+                                    curandState curandStates[]
                                 ){
     
     int x = threadIdx.x + blockDim.x*blockIdx.x;
@@ -25,8 +26,7 @@ __global__ void add_objects_to_world_kernel(float *world_value, int *world_id, i
 
         if(world_id[idx]==0){
             // instantiate a random generator
-            curandState state;
-            curand_init(clock64(),threadIdx.x,0,&state);
+            curandState state = curandStates[threadIdx.x];
             float p_occupation = curand_uniform(&state);
 
             // if the random value is over a threashold, then generate a random value for the cell and store the chosen ID
@@ -212,6 +212,7 @@ __global__ void clean_around_cells_kernel (float* world_value_d, int* world_id_d
     //Wrapper add objects to world
 void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_world,
                                 int id, float min_value, float max_value, float threshold,
+                                curandState curandStates[],
                                 cudaStream_t stream) {
 
     dim3 blockDim(16, 16);
@@ -219,7 +220,8 @@ void launch_add_objects_to_world(float* world_value_d, int* world_id_d, int dim_
 
     add_objects_to_world_kernel<<<gridDim, blockDim, 0, stream>>>(
         world_value_d, world_id_d, dim_world,
-        id, min_value, max_value, threshold
+        id, min_value, max_value, threshold,
+        curandStates
     );
 
 }
@@ -267,186 +269,6 @@ void launch_clean_around_cells(float* world_value_d, int* world_id_d, int dim_wo
 }
 
 // ===============================================================================================================================================================
-
-// kernel that read the world and then save the index of the cell alive in cell alive vector
-// after that start a reduction to compute the number of cells
-__global__ void find_index_cell_alive_kernel(
-    int *world_id,
-    int *cell_alive_vector,
-    int world_dim_tot,
-    int *n_cell_alive
-) {
-    extern __shared__ int shared_mem[];
-
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int tid = threadIdx.x;
-
-    int is_alive = 0;
-
-    if (idx < world_dim_tot) {
-        is_alive = (world_id[idx] > 0);
-        cell_alive_vector[idx] = is_alive * (idx+1);
-    }
-
-    // write the value in the shared memory (0 if exceed the limits, that is for don't doing illigal memory access)
-    shared_mem[tid] = (idx < world_dim_tot) ? is_alive : 0;
-    __syncthreads();
-
-    // Start the reduction
-    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
-        if (tid < s+1 && tid+s+1 <blockDim.x) {
-            shared_mem[tid] += shared_mem[tid + s+1];
-            shared_mem[tid + s+1]=0;
-        }
-        __syncthreads();
-    }
-
-    // save the value of each reduction (one per block) in n_cell_alive
-    if (tid == 0) {
-        shared_mem[0] += shared_mem[1];
-        shared_mem[1] = 0;
-        atomicAdd(n_cell_alive, shared_mem[0]);
-    }
-}
-
-// kernel that give the first part of compatting the array alive cell
-__global__ void compact_cell_alive_kernel_pt1(
-    int *alive_cell_vector,
-    int *support_vector,
-    int *n_alive_cell,
-    int world_dim
-) {
-    extern __shared__ int shared_mem[]; // [2 * blockDim.x + 1]
-
-    int global_idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int local_idx = threadIdx.x;
-
-    // Clear shared memory
-    shared_mem[local_idx] = 0;
-    shared_mem[blockDim.x + local_idx] = 0;
-
-    // load in shared
-    if (global_idx < world_dim) {
-        shared_mem[local_idx] = alive_cell_vector[global_idx];
-        alive_cell_vector[global_idx] = 0;
-    }
-
-    __syncthreads();
-
-    // thread 0 count the number of alive cell in his block and save it contigous cell in shared memory
-    if (local_idx == 0) {
-        int count = 0;
-        for (int i = 0; i < blockDim.x; i++) {
-            int val = shared_mem[i];
-            if (val > 0) {
-                shared_mem[blockDim.x + count] = val;
-                count++;
-            }
-        }
-
-        // save in the support vector the number of alive cell in his block
-        shared_mem[2 * blockDim.x] = count;
-        support_vector[blockIdx.x] = count;
-    }
-
-    __syncthreads();
-
-    // Rewrite the compact value in global memory 
-    int count = shared_mem[2 * blockDim.x];
-    if (local_idx < count) {
-        alive_cell_vector[global_idx] = shared_mem[blockDim.x + local_idx];
-    }
-
-}
-
-// kernel that start the second part of compatting the alive cell vector
-// this kernel MUST be launch with 1 block
-__global__ void compact_cell_alive_kernel_pt2(int *alive_cell_vector, int *support_vector, int *n_alive_cell, int n_block, int dim_block){
-
-    __shared__ int shared_mem[2];       
-    //mem[0] starting index, mem[1] number of element 
-
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
-
-    // the first cell in shared memory 0 rappresent the offset of the alive cell vector (where to start to write values) 
-    // the second cell in shared memory is the number of alive cell in block
-    // after read the value in the support vector, than update the value of the corrisponding block in the support vector
-    if(n_block==0 && threadIdx.x==0){
-        shared_mem[0] = 0;
-        shared_mem[1] = support_vector[n_block];
-        support_vector[n_block] = shared_mem[0] + shared_mem[1];
-    }else if(n_block>0 && threadIdx.x==0){
-        shared_mem[0] = support_vector[n_block-1];
-        shared_mem[1] = support_vector[n_block];
-        support_vector[n_block] = shared_mem[0] + shared_mem[1];
-    }
-
-    __syncthreads();
-
-    // using threads for writing the alive cell value in adiacent cells, starting form the offset loaded before
-    int idx_alive_cell_read = n_block*dim_block+idx;
-    if(idx<shared_mem[1]){
-        int offset = shared_mem[0];
-        int idx_alive_cell_write = offset+idx;
-        alive_cell_vector[idx_alive_cell_write] = alive_cell_vector[idx_alive_cell_read]-1;
-    }
-
-
-}
-
-
-//Wrapper compute alive cell
-void launch_find_index_cell_alive(
-    int *world_id,
-    int world_dim_tot,
-    int *alive_cell_vector,
-    int *n_cell_alive_d,
-    int *n_cell_alive_h,
-    int *support_vector_d,
-    cudaStream_t stream
-) {
-    int n_thread = 1024;
-    if(world_dim_tot<n_thread) n_thread = world_dim_tot;
-    int n_block = (world_dim_tot+n_thread-1) / n_thread;
-
-
-    cudaMemsetAsync(n_cell_alive_d, 0, sizeof(int),stream);
-
-    find_index_cell_alive_kernel<<<n_block,n_thread,sizeof(int)*(n_thread+1),stream>>>(
-        world_id,
-        alive_cell_vector,
-        world_dim_tot,
-        n_cell_alive_d
-    );
-
-    n_thread = 512;
-    n_block = (world_dim_tot+n_thread-1) / n_thread;
-
-    compact_cell_alive_kernel_pt1<<<n_block,n_thread,sizeof(int)*(n_thread*2+1),stream>>>(
-        alive_cell_vector,
-        support_vector_d,
-        n_cell_alive_d,
-        world_dim_tot
-    );
-
-    int block_dim_pt1 = n_thread;
-    int n_block_pt1 = n_block;
-
-    // this part is sequential, it is suppose to start to reorder the cell alive vector staring from index 0 to the n_alive_cell index
-    // launch the kernel with only one block
-    for(int i=0; i<n_block_pt1; i++){
-        compact_cell_alive_kernel_pt2<<<1,n_thread,0,stream>>>(
-            alive_cell_vector,
-            support_vector_d,
-            n_cell_alive_d,
-            i,
-            block_dim_pt1
-        );
-    }
-
-
-}
-
 
 __global__ void alive_cells_builder_kernel(int* mondo_id, int* alive_cells_d, int thread_number){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;

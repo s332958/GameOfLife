@@ -16,14 +16,11 @@
   -starting_value 128.0 \
   -energy_fraction 1.0 \
   -energy_decay 0.006 \
-  -winners_fraction 0.7 \
-  -recombination_fraction 0.95 \
-  -mutation_probability 1.0 \
-  -mutation_range 0.04 \
+  -clone_fraction 0.7 \
   -clean_window_size 3 \
   -model_structure 50,25,10\
-  -std 6 \
-  -alpha 1 \
+  -mutation_range 6 \
+  -learning_rate 1 \
   -load 
 
   # -render \

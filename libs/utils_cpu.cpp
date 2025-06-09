@@ -6,25 +6,6 @@
 #include <string>
 #include <stdexcept>
 
-template <typename T>
-float argsort_bubble(T *vettore, int *indice, int n) {
-    float sum = 0;
-    for (int i = 0; i < n; i++) {
-        indice[i] = i;
-        sum += vettore[i];         
-    }
-    for (int i = 0; i < n - 1; i++) {        
-        for (int j = 0; j < n - i - 1; j++) {
-            if (vettore[indice[j]] < vettore[indice[j + 1]]) {
-                int temp = indice[j];
-                indice[j] = indice[j + 1];
-                indice[j + 1] = temp;
-            }
-        }
-    }
-    return sum;
-}
-
 inline void checkCudaError(cudaError_t result, const char *msg, const char *file, int line) {
     if (result != cudaSuccess) {
         std::string error_message = std::string("[CUDA ERROR] ") + msg + 
@@ -184,30 +165,4 @@ void append_score_to_file(const std::string& filename, float tot_score) {
 
     out << tot_score << "\n";  
     out.close();
-}
-
-
-
-// function for saving map value (FOR DEBUG)
-void save_map(
-    FILE *file,
-    const int dim_world,
-    const float* world_value,
-    const int* world_id
-){
-
-    if (file == NULL) {
-        perror("Errore nell'apertura del file");
-        return;
-    }
-
-
-    for(int riga=0; riga<dim_world; riga++){
-        for(int colonna=0; colonna<dim_world; colonna++){
-            fprintf(file,"%.2f(%3d)  ",world_value[riga*dim_world+colonna],world_id[riga*dim_world+colonna]);
-        }
-        fprintf(file,"\n");
-    }
-     fprintf(file,"\n\n\n");
-
 }

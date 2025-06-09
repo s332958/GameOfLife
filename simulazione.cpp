@@ -8,16 +8,8 @@
 #include "simulazione.h"
 
 #include <GLFW/glfw3.h>
-
-#include <stdio.h>
-#include <time.h>
-#include <unistd.h>
 #include <cstring>
-#include <iostream>
-#include <cuda_runtime.h>
-#include <cmath>
-#include <iomanip>
-#include <string>
+
 #define FRAME_TIME_US 16666 
 
 void simulazione(
@@ -58,12 +50,7 @@ void simulazione(
     float energy_fraction = simulation_setup.energy_fraction;
     float energy_decay = simulation_setup.energy_decay;
 
-    float winners_fraction = simulation_setup.winners_fraction;
-    float recombination_newborns_fraction = simulation_setup.recombination_newborns_fraction;
-    
-    float gen_x_block = simulation_setup.gen_x_block;
-    float mutation_probability = simulation_setup.mutation_probability;
-    float mutation_range = simulation_setup.mutation_range;
+    float clone_fraction = simulation_setup.clone_fraction;
 
     int clean_window_size = simulation_setup.clean_window_size;
 
@@ -162,7 +149,6 @@ void simulazione(
     float *variation_model_biases_d   = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);    
     float *new_models_weights_d       = (float*) cuda_allocate(tot_models_weight_size, cc_major, 0);
     float *new_models_biases_d        = (float*) cuda_allocate(tot_models_bias_size, cc_major, 0);
-    // int   *support_vector_d           = (int*)   cuda_allocate(tot_world_dim_size_int, cc_major, 0);
     curandState *curandStates         = nullptr;
     int   *n_cell_alive_d             ; 
     
@@ -311,13 +297,8 @@ void simulazione(
         // - Aggiunta cibo al mondo
         // - Possibile ottimizzazione togliendo i curandstate
         
-        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 1.0f, 10.0f, random_threshold_food, 0);
+        launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 1.0f, 10.0f, random_threshold_food, curandStates, 0);
         CUDA_CHECK(cudaGetLastError());
-        
-        /*
-        launch_clean_around_cells(world_value_d, world_id_d, world_dim, alive_cells_d, n_cell_alive_h, clean_window_size, 0);
-        CUDA_CHECK(cudaGetLastError());
-        */
 
         // - Generazione nuove creature per la simulazione
         launch_generate_clone_creature(
@@ -330,7 +311,7 @@ void simulazione(
             n_weight,
             n_bias,
             n_creature,
-            winners_fraction*n_creature,
+            clone_fraction*n_creature,
             std,
             0,
             curandStates
@@ -343,8 +324,6 @@ void simulazione(
         /*======================================================================================================================================*/
 
         for(int step=0; step<N_STEPS && *n_cell_alive_h > 0; step++){
-
-            // printf(" epoch: %d step: %d alive_cell: %d \n" , epoca, step, *n_cell_alive_h );
             
             start = clock();
             if(render){
@@ -427,8 +406,6 @@ void simulazione(
                 CUDA_CHECK(cudaGetLastError());
 
                 offset_workspace += limit_workspace_cell;
-                //cudaDeviceSynchronize(); 
-
 
             }
 
@@ -444,8 +421,7 @@ void simulazione(
             );                    
 
             int new_n_cell = 0;
-            compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell, 0);
-            //cudaDeviceSynchronize();        
+            compact_with_thrust(world_id_d, alive_cells_d, world_dim, new_n_cell, 0);     
             *n_cell_alive_h = new_n_cell;
 
             if(render){

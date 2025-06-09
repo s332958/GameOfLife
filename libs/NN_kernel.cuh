@@ -61,19 +61,6 @@ void launch_compute_energy_and_occupation(
     cudaStream_t stream
 );
 
-// function for recombine the models
-void launch_recombine_models_kernel(
-    float *d_weights, float *d_biases,
-    float *d_new_weights, float *d_new_biases,
-    int num_weights_per_model, int num_bias_per_model,
-    int model1_idx, int model2_idx, int output_idx,
-    float gen_x_block,
-    float mutation_prob,
-    float mutation_range,
-    unsigned long seed,
-    cudaStream_t stream
-);
-
 // Function for update the original model
 void launch_update_model(
     float *weight_starting_model,

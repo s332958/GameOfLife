@@ -37,23 +37,6 @@ void launch_fill_random_kernel(float* d_vec, int start, int finish, float minVal
     fill_random_kernel<<<blocks, threads, 0, stream>>>(d_vec, start, finish, minVal, maxVal, states);
 
 }
-template <typename T>
-__global__ void resetKernel(T* d_vec, int n) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= n) return;
-    d_vec[idx] = T(0);
-}
-
-template <typename T>
-void launch_reset_kernel(T* d_vec, int n, cudaStream_t stream) {
-    int threads = 1024;
-    int blocks = (n + threads - 1) / threads;
-    resetKernel<T><<<blocks, threads, 0, stream>>>(d_vec, n);
-}
-
-// ========== Esplicit template instantiation ==========
-template void launch_reset_kernel<float>(float*, int, cudaStream_t);
-template void launch_reset_kernel<int>(int*, int, cudaStream_t);
 
 
 

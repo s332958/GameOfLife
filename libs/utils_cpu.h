@@ -16,26 +16,6 @@ inline void checkCudaError(cudaError_t result, const char* msg, const char* file
 }
 #define CUDA_CHECK(val) checkCudaError((val), #val, __FILE__, __LINE__)
 
-// ========== TEMPLATE argsort_bubble ==========
-template <typename T>
-float argsort_bubble(T *vettore, int *indice, int n) {
-    float sum = 0;
-    for (int i = 0; i < n; i++) {
-        indice[i] = i;
-        sum += vettore[i];         
-    }
-    for (int i = 0; i < n - 1; i++) {        
-        for (int j = 0; j < n - i - 1; j++) {
-            if (vettore[indice[j]] < vettore[indice[j + 1]]) {
-                int temp = indice[j];
-                indice[j] = indice[j + 1];
-                indice[j + 1] = temp;
-            }
-        }
-    }
-    return sum;
-}
-
 // ======== OTHER FUNCTION =======================
 void computeFreeMemory(size_t* free_memory);
 void* cuda_allocate(size_t size, int cc_major, cudaStream_t stream = 0);
@@ -46,4 +26,3 @@ int  get_random_int(int min, int max);
 void save_model_on_file(const std::string& nome_file, const float* pesi_totale, const float* bias_totale, int dim_pesi, int dim_bias);
 int  load_model_from_file(const std::string& nome_file, float* pesi_totale, float* bias_totale, int dim_pesi, int dim_bias);
 void append_score_to_file(const std::string& filename, float tot_score);
-void save_map(FILE* file, int dim_world, const float* world_value, const int* world_id);
