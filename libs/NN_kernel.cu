@@ -592,8 +592,6 @@ __global__ void update_model_kernel(
 
         val = (val * alpha) / (n_creature * std);
 
-        //printf("VAL: %f varation: %f, score: %f, tot_score: %f \n",val,varation_biases_vector[params_idx],score_vector[creature_idx],shared_mem[1]);
-
         biases_starting_model[params_idx] += val;
 
     }
