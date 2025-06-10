@@ -4,6 +4,7 @@
 #include <curand_kernel.h>
 #include <iostream>
 
+// some activation function
 __device__ float relu(float x) {
     return x > 0.0f ? x : 0.0f;
 }
@@ -28,19 +29,25 @@ __global__ void vision_kernel(
     int dim_input
 ) 
 {
-
+    //global index
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    
+
+    //index of workspace
     int index_cell = index / dim_input;
+    //cell of the workspace
     int vision_index = index % dim_input;
     
+    //return thread that exceed 
     if (index >= dim_input*limit_workspace_cell) return;
 
+    // dimension of vision of each alive cell
     int dim_window_sq = dim_window*dim_window;
     int radius = dim_window / 2;
 
+    //get the center
     int center_index = cell_idx[index_cell];
 
+    // indixing all window vision positions
     int vision_window_index = vision_index % dim_window_sq;
     int visiontype_index = vision_index / dim_window_sq;
 
@@ -57,6 +64,8 @@ __global__ void vision_kernel(
 
     int cell_ID = world_id[center_index];
     int vision_ID = world_id[real_vision_index];
+
+    // apply the change of sign for enemy cell
     if(visiontype_index == 0){
         if(cell_ID == vision_ID){            
             workspace[index] = world_signaling[real_vision_index];
@@ -96,22 +105,29 @@ __global__ void NN_forward_weight_kernel(
         if (tidx >= layer1_size * layer2_size * limit_workspace_cell){
             return;
         }
+        // cell index is the index of the cell in the array alive cell
         int cell_index = tidx / (layer1_size * layer2_size);
+        // index of the weight 
         int weight_index = tidx % (layer1_size * layer2_size);
-       
-        int world_index = cells[cell_index];
-        int ID = world_id[world_index];
-                
+        
+        // get the id from cell index
+        int ID = world_id[cells[cell_index]];
+        
+        // get the correct weight of the correct creature, consisdering the layer offset
         int true_weight_index = n_weights * (ID - 1) + weight_index + offset_weights; 
-         
+        
+        // indexing for compute the input and output
         int input_neuron_idx  = weight_index % layer1_size;
         int output_neuron_idx = weight_index / layer1_size;
 
+        // consider position of cell in the input or output array and then get the offset of the correct input or output
         int input_index  = cell_index * layer1_size  + input_neuron_idx;
         int output_index = cell_index * layer2_size  + output_neuron_idx;
-            
+        
+        // compute the result value
         float weighted = weights[true_weight_index] * input[input_index];
 
+        // atomic add for update the corrispondent output cell in the corrispondent working station
         atomicAdd(&output[output_index], weighted);
         
 }
@@ -226,6 +242,8 @@ __global__ void compute_energy_and_occupation_kernel(
 
     if (id < 0)return;
     
+    //atomic add direct on global GPU, better performcance on large number of creature
+    //code not verbose
     atomicAdd(&occupation_vector[id], 1.0f);
     atomicAdd(&energy_vector[id], world_value[index]);
 
@@ -260,9 +278,7 @@ void launch_vision(
         input_workspace,
         limit_workspace_cell,
         dim_input
-    );
-    //if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori vision_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));          
-
+    ); 
 
 }
 
@@ -326,9 +342,9 @@ void launch_NN_forward(
             layer2_size, 
             biases_offset
         ); 
-        //if(cudaGetLastError()!=cudaError::cudaSuccess) printf("errori NN_forward_kernel: %s\n",cudaGetErrorString(cudaGetLastError()));
         
         if (i < (dim_structure-2)){
+            // reset all workspaces
             cudaMemcpy(input_workspace, output_workspace, workspace_size*limit_workspace_cell, cudaMemcpyDeviceToDevice);
             cudaMemset(output_workspace, 0, workspace_size*limit_workspace_cell);
         }

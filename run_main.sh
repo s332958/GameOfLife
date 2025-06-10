@@ -1,10 +1,10 @@
 #!/bin/bash
-./main.exe \
-  -ep 100 \
-  -st 5000 \
+nsys profile ./main.exe \
+  -ep 5 \
+  -st 1000 \
   -scale 1 \
-  -world_dim 500 \
-  -n_creature 5 \
+  -world_dim 1024 \
+  -n_creature 100 \
   -eval_method 1 \
   -reserve_memory 50 \
   -checkpoint_epoch 1 \

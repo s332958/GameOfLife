@@ -45,7 +45,7 @@ void load_constant_memory_GPU(int n_creature) {
     float *color_h = (float*) malloc(sizeof(int)*n_creature*3);
     generateDistinctColors(color_h, n_creature);
 
-
+    // to constant memory
     cudaMemcpyToSymbol(COLORI, color_h, sizeof(float) * 300 * 3);
     free(color_h);
 }
@@ -54,30 +54,39 @@ void load_constant_memory_GPU(int n_creature) {
 // Kernel for generating colors from world_value and world_id
 __global__ void mappa_colori_kernel(float* mondo, int* id_matrix, float* mondo_rgb, int thread_number) {
     
+    // number of thread
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
+    // return if exceed
     if (index >= thread_number) return;
 
+    //compute pixel index and channel index 
     int pixel_index = index / 3;
     int channel = index % 3;
 
+    // get id from id_matrix and get value from world_value (mondo)
     int ID = id_matrix[pixel_index];
     float value = mondo[pixel_index];
 
+    // compute index output
     int out_index = pixel_index * 3 + channel;
 
+    // id obstacle chise color red
     if (ID == -1) {
-        mondo_rgb[out_index] = (channel == 0) ? 1.0f : 0.0f;  // red for obstacles
+        mondo_rgb[out_index] = (channel == 0) ? 1.0f : 0.0f;  
     }
+    // neutral cell are in gray scale
     else if (ID == 0) {
-        mondo_rgb[out_index] = value;  // gray scale for neutral cell
+        mondo_rgb[out_index] = value;  
     }
+    // for other color read the constant memory with colors
     else{
         mondo_rgb[out_index] = COLORI[ID - 1][channel] * (value + 0.005) * 5;
     }
 
 }
 
+// similar to the precedent but get also the signal map
 __global__ void mappa_signal_kernel(float * mondo_value, int* id_matrix, float* mondo_signal, float* mondo_rgb, int n_creature, int thread_number) {
     
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -94,10 +103,10 @@ __global__ void mappa_signal_kernel(float * mondo_value, int* id_matrix, float* 
     int out_index = pixel_index * 3 + channel;
 
     if (ID == -1) {
-        mondo_rgb[out_index] = (channel == 0) ? 1.0f : 0.0f;  // red for obstacles
+        mondo_rgb[out_index] = (channel == 0) ? 1.0f : 0.0f;  
     }
     else if (ID == 0) {
-        mondo_rgb[out_index] = mondo_value[pixel_index];  // gray scale for neutral cell
+        mondo_rgb[out_index] = mondo_value[pixel_index]; 
     }
     else{
         mondo_rgb[out_index] = COLORI[ID - 1][channel] * signal;
