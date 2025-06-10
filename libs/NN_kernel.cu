@@ -233,21 +233,40 @@ __global__ void compute_energy_and_occupation_kernel(
     int world_dim,
     int n_creature
 ) {
+    //shared memmory with ncreature*2
+    extern __shared__ float shared_mem[]; 
+    float* shared_occ = shared_mem;
+    float* shared_energy = shared_mem + n_creature;
 
-    int index = blockDim.x * blockIdx.x + threadIdx.x;
+    int tid = threadIdx.x;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int total_cells = world_dim * world_dim;
 
-    if (index >= world_dim * world_dim) return;
+    // Initialize shared memory
+    if (tid < n_creature) {
+        shared_occ[tid] = 0.0f;
+        shared_energy[tid] = 0.0f;
+    }
+    __syncthreads();
 
-    int id = world_id[index] - 1;
+    // Each thread processes one cell
+    if (idx < total_cells) {
+        int id = world_id[idx] - 1;
+        if (id >= 0 && id < n_creature) {
+            atomicAdd(&shared_occ[id], 1.0f);
+            atomicAdd(&shared_energy[id], world_value[idx]);
+        }
+    }
 
-    if (id < 0)return;
-    
-    //atomic add direct on global GPU, better performcance on large number of creature
-    //code not verbose
-    atomicAdd(&occupation_vector[id], 1.0f);
-    atomicAdd(&energy_vector[id], world_value[index]);
+    __syncthreads();
 
+    // One warp (or all threads) writes back to global memory
+    if (tid < n_creature) {
+        atomicAdd(&occupation_vector[tid], shared_occ[tid]);
+        atomicAdd(&energy_vector[tid], shared_energy[tid]);
+    }
 }
+
 
 //=================================================================================
 
@@ -412,8 +431,9 @@ void launch_compute_energy_and_occupation(
     int thread_number = world_dim * world_dim;
 
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
+    size_t shared_memory_size = n_creature*2*sizeof(float);
 
-    compute_energy_and_occupation_kernel<<<n_block,n_thread_per_block,0,stream>>>(
+    compute_energy_and_occupation_kernel<<<n_block,n_thread_per_block,shared_memory_size,stream>>>(
         world_value,
         world_id,
         occupation_vector,

@@ -1,5 +1,5 @@
 #!/bin/bash
-nsys profile ./main.exe \
+nvprof ./main.exe \
   -ep 5 \
   -st 1000 \
   -scale 1 \
@@ -21,6 +21,8 @@ nsys profile ./main.exe \
   -model_structure 50,25,10\
   -mutation_range 6 \
   -learning_rate 1 \
+  -max_workspace 10 \
+  -render \
   -load 
 
   # -render \

@@ -35,7 +35,9 @@ void simulazione(
     int N_STEPS = simulation_setup.N_STEPS;
     int MAX_WORKSPACE = simulation_setup.MAX_WORKSPACE;
     int METHOD_EVAL = simulation_setup.METHOD_EVAL;
+
     bool render = simulation_setup.render;
+    bool wath_signaling = simulation_setup.watch_signaling;
 
     int checkpoint_epoch = simulation_setup.checkpoint_epoch;
     
@@ -66,7 +68,7 @@ void simulazione(
     float alpha = simulation_setup.alpha;
 
     // -------------------------------------------
-    // PRE-FASE : Info GPU
+    // PRE-PHASE : Info GPU
     // -------------------------------------------
 
     int device;
@@ -90,10 +92,10 @@ void simulazione(
     std::cout << "Inizio simulazione...\n";
 
     // -------------------------------------------
-    // PRE-FASE : Inizializzazione generale
+    // PRE-PAHSE: General Initialization
     // -------------------------------------------
 
-    // Calcolo dimensione pesi e bias totali e dim kernel visione
+    // comute weights dim and biases dim 
     int n_weight = 0;
     int n_bias = 0;
     for(int i = 0; i < n_layer - 1; ++i) {
@@ -111,7 +113,7 @@ void simulazione(
     size_t tot_weights_size = n_weight * sizeof(float);
     size_t tot_biases_size = n_bias * sizeof(float);
 
-    // Allocazioni CPU
+    // Allocation CPU
     float *world_rgb_h         = (float*) malloc(tot_world_dim_size_float*3);
     float *world_value_h       = (float*) malloc(tot_world_dim_size_float);    
     float *world_signal_h      = (float*) malloc(tot_world_dim_size_float);
@@ -123,10 +125,10 @@ void simulazione(
     float *model_weights_h     = nullptr;
     float *model_biases_h      = nullptr;
 
-    // Siccome n_alive_cell è solo un int e viene passato spesso lo alloco nella memoria pinnata della RAM che viene condivsa con la GPU
+    // Shared mem between host and device for the int
     cudaHostAlloc((void**)&n_cell_alive_h, sizeof(int), cudaHostAllocMapped);
 
-    // Anche from n model to load in one singel model
+    // allocate memory if the model is not loaded
     if(weights_models==nullptr) model_weights_h = (float*) malloc(tot_weights_size);
     else model_weights_h       = weights_models;
     if(biases_models==nullptr)  model_biases_h = (float*) malloc(tot_biases_size);
@@ -134,7 +136,7 @@ void simulazione(
 
 
 
-    // Allocazioni GPU 
+    // Allocation GPU 
     float *world_rgb_d                = (float*) cuda_allocate(tot_world_dim_size_float * 3, cc_major, 0);
     float *world_value_d              = (float*) cuda_allocate(tot_world_dim_size_float, cc_major, 0);    
     float *world_signal_d             = (float*) cuda_allocate(tot_world_dim_size_float, cc_major, 0);
@@ -152,7 +154,9 @@ void simulazione(
     curandState *curandStates         = nullptr;
     int   *n_cell_alive_d             ; 
     
+    // pass the pointer of n_cell alive on device
     cudaHostGetDevicePointer(&n_cell_alive_d, n_cell_alive_h , 0);
+    // allocate random state
     cudaMalloc((void**) &curandStates, sizeof(curandState)*1024);
 
     // Find max dim layer
@@ -163,7 +167,7 @@ void simulazione(
         }
     }
     
-    // Calcolo spazio massimo disponibile per workspace
+    // Find max space for workspace
     int dim_max_layer = model_structure[i_max];
     int dim_input = model_structure[0];
     int dim_output = model_structure[n_layer - 1];
@@ -185,7 +189,7 @@ void simulazione(
     std::cout << "Workspace size per slot: " << workspace_size << " bytes\n";
     std::cout << "Allocate " << n_workspace << " workspace slots for the simulation.\n";
 
-    // allocazione workspace
+    // allocationworkspace
     float *workspace_input_d  = (float*) cuda_allocate(n_workspace * workspace_size, cc_major, 0);
     float *workspace_output_d  = (float*) cuda_allocate(n_workspace * workspace_size, cc_major, 0);
   
@@ -194,7 +198,7 @@ void simulazione(
 
     printf("END ALLOCATIONS\n");
 
-    // Preparazione curandStates
+    // preparee curandStates
     launch_init_curandstates(
         curandStates,
         1024,
@@ -202,10 +206,10 @@ void simulazione(
         0
     );
 
-    // CARIMENTO DATI
+    // LOAD MODEL
     if(biases_models==nullptr && weights_models==nullptr){       
         
-        // Generation random models
+        // Generate random model
         launch_fill_random_kernel(model_weights_d,0,n_weight,0,0,curandStates,0);
         CUDA_CHECK(cudaGetLastError());
         launch_fill_random_kernel(model_biases_d,0,n_bias,0,0,curandStates,0);
@@ -234,7 +238,7 @@ void simulazione(
     printf("LOAD MODEL ON GPU\n");
     
     // -------------------------------------------
-    // FASE 1 : preparazione epoca 
+    // PHASE 1 : epoch preparation 
     // -------------------------------------------
     for (int epoca = 0; epoca < N_EPOCH; epoca++) {
         std::cout << "=======================  Epoca: " << epoca << "  ========================\n";
@@ -254,22 +258,24 @@ void simulazione(
 
         printf("RESET ALL MATRIX \n"); 
 
-        // - Aggiunta ostacoli perlin al mondo
+        // Add perling obstacles to the world
         launch_perlinNoise_obstacles(world_dim, world_id_d, PN_scale_obstacles, PN_threshold_obstacles, 0);
         CUDA_CHECK(cudaGetLastError());
         
-        // - Aggiunta cibo perlin al mondo
+        // Add perling food to the world
         launch_perlinNoise_food(world_dim, world_id_d, world_value_d, PN_scale_food, PN_threshold_food, 0);
         CUDA_CHECK(cudaGetLastError());
 
+        // Move the world on CPU from GPU
         cuda_memcpy(world_value_h, world_value_d, tot_world_dim_size_float, cudaMemcpyDeviceToHost, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
         cuda_memcpy( world_id_h, world_id_d, tot_world_dim_size_int, cudaMemcpyDeviceToHost, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
+        // Is needed becouse we need to manipulate the world on CPU 
         cudaDeviceSynchronize();
 
-        // ======================================== Aggiunta creature al mondo 
+        // ======================================== Add Creature to world
 
         int random_index = rand() % world_dim*world_dim;
         for (int i = 0; i < n_creature; i++){
@@ -286,7 +292,7 @@ void simulazione(
 
         printf("SETUP CELL ALIVE \n");
 
-        // - Passo il mondo valori, cellule vive ed ID sulla GPU
+        // - Return the world update with creature and vector cell alive on  GPU
         cuda_memcpy(world_value_d, world_value_h, tot_world_dim_size_float, cudaMemcpyHostToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
         cuda_memcpy(world_id_d, world_id_h, tot_world_dim_size_int, cudaMemcpyHostToDevice, cc_major, 0);
@@ -294,13 +300,11 @@ void simulazione(
         cuda_memcpy(alive_cells_d, alive_cells_h, tot_world_dim_size_int, cudaMemcpyHostToDevice, cc_major, 0);
         CUDA_CHECK(cudaGetLastError());
 
-        // - Aggiunta cibo al mondo
-        // - Possibile ottimizzazione togliendo i curandstate
-        
+        // Add random food to world
         launch_add_objects_to_world(world_value_d, world_id_d, world_dim, 0, 1.0f, 10.0f, random_threshold_food, curandStates, 0);
         CUDA_CHECK(cudaGetLastError());
 
-        // - Generazione nuove creature per la simulazione
+        // Generate new creature for simulation
         launch_generate_clone_creature(
             model_weights_d,
             model_biases_d,
@@ -319,7 +323,7 @@ void simulazione(
 
         cudaDeviceSynchronize();
         // -------------------------------------------
-        // FASE 2 : calcolo step 
+        // PHASE 2 : compute step
         // -------------------------------------------
         /*======================================================================================================================================*/
 
@@ -333,10 +337,11 @@ void simulazione(
                 }
             }         
 
-
+            // define offset and window of vision of cell
             int offset=0;
             int vision = sqrt(dim_input/2);
 
+            // set to zero contributions, input and output
             cudaMemset(world_contributions_d, 0, tot_matrix_contribution_size);
             CUDA_CHECK(cudaGetLastError());
             cudaMemset(workspace_input_d, 0, n_workspace * workspace_size);
@@ -426,11 +431,13 @@ void simulazione(
 
             if(render){
 
-                launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, 0);
-                CUDA_CHECK(cudaGetLastError());
-
-                //launch_mappa_signal(world_value_d, world_id_d, world_signal_d, world_rgb_d, world_dim, n_creature, 0);
-                //CUDA_CHECK(cudaGetLastError());
+                if(wath_signaling==false){
+                    launch_mappa_colori(world_value_d, world_id_d, world_rgb_d, world_dim, 0);
+                    CUDA_CHECK(cudaGetLastError());
+                }else{
+                    launch_mappa_signal(world_value_d, world_id_d, world_signal_d, world_rgb_d, world_dim, n_creature, 0);
+                    CUDA_CHECK(cudaGetLastError());
+                }
 
                 cuda_memcpy(world_rgb_h, world_rgb_d, tot_world_dim_size_float * 3, cudaMemcpyDeviceToHost, cc_major, 0);
                 CUDA_CHECK(cudaGetLastError());
@@ -452,7 +459,7 @@ void simulazione(
 
             
 
-            // ======================================== Aggiornamento vettori valutazione occupazione ed energia
+            // Update energy and occupation for each creature
             launch_compute_energy_and_occupation(world_value_d,world_id_d,occupation_vector_d,energy_vector_d,world_dim,n_creature, 0);
             CUDA_CHECK(cudaGetLastError());
 
@@ -463,7 +470,7 @@ void simulazione(
         }
 
         // -------------------------------------------
-        // FASE 3 : generazione nuove creature 
+        // PHASE 3 : New Creature Generation
         // -------------------------------------------
 
         float *chosen_points = nullptr;
@@ -485,7 +492,7 @@ void simulazione(
             0
         );    
 
-        // ======================================== Salvataggio nuovo modelli
+        // Save new model
         if((epoca != 0 && epoca%checkpoint_epoch == 0) || epoca == (N_EPOCH - 1)){    
             cuda_memcpy(model_weights_h,model_weights_d,tot_weights_size,cudaMemcpyDeviceToHost,cc_major,0);        
             cuda_memcpy(model_biases_h,model_biases_d,tot_biases_size,cudaMemcpyDeviceToHost,cc_major,0); 
@@ -510,7 +517,7 @@ void simulazione(
 
 
     // -------------------------------------------
-    // POST-FASE : 
+    // POST-PHASE : 
     // -------------------------------------------
     fine:
 
@@ -526,33 +533,35 @@ void simulazione(
     cuda_Free(world_id_d, cc_major, 0);
     cuda_Free(world_contributions_d, cc_major, 0);
     cuda_Free(world_signal_d, cc_major, 0);
+
     cuda_Free(alive_cells_d, cc_major, 0);
     cuda_Free(occupation_vector_d, cc_major, 0);
     cuda_Free(energy_vector_d, cc_major, 0);
+
     cuda_Free(model_biases_d, cc_major, 0);
     cuda_Free(model_weights_d, cc_major, 0);
     cuda_Free(variation_model_weights_d, cc_major, 0);
     cuda_Free(variation_model_biases_d, cc_major, 0);
     cuda_Free(new_models_weights_d, cc_major, 0);
     cuda_Free(new_models_biases_d, cc_major, 0);
+
     cuda_Free(workspace_input_d, cc_major, 0);
-
-    free(energy_vector_h);
-    free(occupation_vector_h);
-    free(model_weights_h);
-    free(model_biases_h);
-
-    free(alive_cells_h);
+    
     free(world_id_h);
     free(world_signal_h);
     free(world_rgb_h);
     free(world_value_h);
 
+    free(alive_cells_h);
+    free(energy_vector_h);
+    free(occupation_vector_h);
+
+    free(model_weights_h);
+    free(model_biases_h);
+
     cudaFreeHost(n_cell_alive_h);
-    
     
     printf("FREE DONE\n");
     
-
     std::cout << "End Simulation. \n";
 }
