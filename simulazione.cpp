@@ -177,6 +177,8 @@ void simulazione(
     computeFreeMemory(&free_mem);
     int n_workspace = (free_mem > reserve_free_memory) ? (free_mem - reserve_free_memory) / (workspace_size * 2) : 0;
 
+    if (n_workspace > MAX_WORKSPACE) n_workspace = MAX_WORKSPACE;
+
     // if are not allocate workspace return error
     if (n_workspace == 0) {
         throw std::runtime_error("No memory for workspace... impossible to continue.");
