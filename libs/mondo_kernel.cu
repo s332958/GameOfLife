@@ -263,7 +263,7 @@ void launch_world_update(
 ){
 
 
-    int n_thread_per_block = 1024; 
+    int n_thread_per_block = 512; 
     int thread_number = world_dim*world_dim;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
@@ -283,7 +283,7 @@ void launch_world_update(
 // wrapper that launch clear space around cells
 void launch_clean_around_cells(float* world_value_d, int* world_id_d, int dim_world, int* cellule, int* ncellule, int window_size, cudaStream_t stream){
 
-    int n_thread_per_block = 1024; 
+    int n_thread_per_block = 512; 
     int localNcellule = *ncellule;
     int thread_number = localNcellule * window_size * window_size;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
@@ -315,7 +315,7 @@ __global__ void alive_cells_builder_kernel(int* mondo_id, int* alive_cells_d, in
 
 void compact_with_thrust(int* mondo_id, int* alive_cells_d, int dim_world, int &new_size, cudaStream_t stream) {
 
-    int n_thread_per_block = 1024; 
+    int n_thread_per_block = 512; 
     int thread_number = dim_world*dim_world;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 

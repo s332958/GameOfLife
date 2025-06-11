@@ -283,7 +283,7 @@ void launch_vision(
     cudaStream_t stream
 ){
 
-    int n_thread_per_block = 1024;
+    int n_thread_per_block = 512;
     int dim_input = dim_window * dim_window * 2;
     int thread_number = dim_input * limit_workspace_cell;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
@@ -319,7 +319,7 @@ void launch_NN_forward(
     int dim_structure,                              
     cudaStream_t stream    
 ){
-    int n_thread_per_block = 1024;
+    int n_thread_per_block = 512;
     int layer1_size = 0;
     int layer2_size = 0;
     int weight_offset = 0;
@@ -392,7 +392,7 @@ void launch_output_elaboration(
     cudaStream_t stream
 ){
     int window_size = sqrt(output_size - 1);
-    int n_thread_per_block = 1024;
+    int n_thread_per_block = 512;
     int thread_number = limit_workspace_cell * output_size;
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
 
@@ -427,7 +427,7 @@ void launch_compute_energy_and_occupation(
     cudaStream_t stream
 ){
 
-    int n_thread_per_block = 1024; 
+    int n_thread_per_block = 512; 
     int thread_number = world_dim * world_dim;
 
     int n_block = (thread_number + n_thread_per_block - 1) / n_thread_per_block;
@@ -524,7 +524,7 @@ void launch_generate_clone_creature(
 ){
 
     int n_thread = n_weights*n_creature;
-    if(n_thread>1024) n_thread = 1024;
+    if(n_thread>512) n_thread = 512;
     int n_block = (n_weights + n_thread -1) / n_thread;
 
     generate_clone_creature_kernel<<<n_block,n_thread,0,stream>>>(
@@ -635,7 +635,7 @@ void launch_update_model(
 ){
 
     int n_thread = n_creature;
-    if(n_thread>1024) n_thread = 1024;
+    if(n_thread>512) n_thread = 512;
     int n_block = n_weights+n_biases;
 
     update_model_kernel<<<n_block,n_thread,0,stream>>>(

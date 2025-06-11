@@ -30,7 +30,7 @@ void launch_fill_random_kernel(float* d_vec, int start, int finish, float minVal
                                 curandState states[],
                                 cudaStream_t stream) {
 
-    int threads = 1024;
+    int threads = 512;
     int n = finish - start;
     int blocks = (n + threads - 1) / threads;
 
