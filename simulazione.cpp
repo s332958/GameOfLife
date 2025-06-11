@@ -157,7 +157,7 @@ void simulazione(
     // pass the pointer of n_cell alive on device
     cudaHostGetDevicePointer(&n_cell_alive_d, n_cell_alive_h , 0);
     // allocate random state
-    cudaMalloc((void**) &curandStates, sizeof(curandState)*1024);
+    cudaMalloc((void**) &curandStates, sizeof(curandState)*world_dim*world_dim);
 
     // Find max dim layer
     int i_max = 0;
@@ -201,7 +201,7 @@ void simulazione(
     // preparee curandStates
     launch_init_curandstates(
         curandStates,
-        1024,
+        world_dim*world_dim,
         0,
         0
     );

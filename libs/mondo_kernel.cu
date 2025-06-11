@@ -26,7 +26,7 @@ __global__ void add_objects_to_world_kernel(float *world_value, int *world_id, i
 
         if(world_id[idx]==0){
             // instantiate a random generator
-            curandState state = curandStates[threadIdx.x];
+            curandState state = curandStates[idx];
             float p_occupation = curand_uniform(&state);
 
             // if the random value is over a threashold, then generate a random value for the cell and store the chosen ID
